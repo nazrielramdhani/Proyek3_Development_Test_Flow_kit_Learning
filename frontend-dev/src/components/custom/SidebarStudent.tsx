@@ -3,6 +3,7 @@ import {
   FaTachometerAlt,
   FaTrophy,
   // FaClipboard,
+  FaBook,
   FaAngleLeft,
   FaAngleRight,
   FaSignOutAlt,
@@ -57,6 +58,7 @@ const SidebarStudent: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
               { path: "/dashboard-student", icon: FaTachometerAlt, label: "Dashboard" },
               // { path: "/access-topics", icon: FaClipboard, label: "Materi Belajar" },
               { path: "/challenge", icon: FaTrophy, label: "Tantangan" },
+              { path: "/topic", icon: FaBook, label: "Topik Pembelajaran" }
               // { path: "/list-challanges", icon: FaTrophy, label: "Tantangan {List}" }
             ].map((item) => (
               <li

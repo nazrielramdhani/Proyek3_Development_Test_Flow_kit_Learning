@@ -77,6 +77,45 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 async def root():
     return {"message": "SAS API version 1.1"}
 
+# --- ADD THIS TO main.py ---
+
+# This is a new endpoint for your MateriPage
+@app.get("/api/topik-pembelajaran")
+def get_topik_pembelajaran():
+    # This is dummy data. Later, you will get this from your database.
+    dummy_data = [
+        {
+            "id": "1",
+            "nama": "Pemrograman Berbasis Objek",
+            "deskripsi": "Pemrograman Berbasis Objek mendalami studi dimana pada suatu bahasa pemrograman, Objek menjadi orientasi utama dari suatu algoritma",
+            "type": "topic"
+        },
+        {
+            "id": "2",
+            "nama": "Komputer Grafik",
+            "deskripsi": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua",
+            "type": "topic"
+        },
+        {
+            "id": "3",
+            "nama": "Matematika Diskrit",
+            "deskripsi": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua",
+            "type": "text"
+        },
+        {
+            "id": "4V",
+            "nama": "Proyek 3",
+            "deskripsi": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua",
+            "type": "pdf"
+        },
+        {
+            "id": "5",
+            "nama": "Basis Data",
+            "deskripsi": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua",
+            "type": "video"
+        }
+    ]
+    return {"topik": dummy_data}
 
 # --- Jadwal (nonaktif, aktifkan kalau diperlukan) ---
 # @app.on_event('startup')
