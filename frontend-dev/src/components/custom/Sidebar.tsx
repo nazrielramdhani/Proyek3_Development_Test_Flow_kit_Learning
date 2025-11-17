@@ -10,6 +10,9 @@ import {
   FaAngleLeft,
   FaAngleRight,
   FaSignOutAlt,
+  FaFolder, // untuk sidebar topik belajar
+  FaBookOpen, // untuk sidebar materi belajar
+
 } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import logo_polban from "../../assets/logo/polban.png";
@@ -65,6 +68,32 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
               <FaTachometerAlt size={16} />
               {isOpen && <span className="ml-2">Dashboard</span>}
             </li>
+            
+            {/* KODE SIDEBAR MENU TOPIK DAN MATERI */}
+          <li
+            className={`flex items-center mb-2 cursor-pointer p-2 rounded ${
+              activeItem === "/learning-topics"
+                ? "bg-white text-blue-800"
+                : "hover:bg-white hover:text-blue-800"
+            }`}
+            onClick={() => handleItemClick("/learning-topics")}
+          >
+            <FaFolder size={16} />
+            {isOpen && <span className="ml-2">Topik Pembelajaran</span>}
+          </li>
+          <li
+            className={`flex items-center mb-2 cursor-pointer p-2 rounded ${
+              activeItem === "/learning-materi"
+                ? "bg-white text-blue-800"
+                : "hover:bg-white hover:text-blue-800"
+            }`}
+            onClick={() => handleItemClick("/learning-materi")}
+          >
+            <FaBookOpen size={16} />
+            {isOpen && <span className="ml-2">Materi Pembelajaran</span>}
+          </li>
+          {/* AKHIR KODE SIDEBAR */}
+
             <li
               className={`flex items-center mb-2 cursor-pointer p-2 rounded ${
                 activeItem === "/list-modules"
