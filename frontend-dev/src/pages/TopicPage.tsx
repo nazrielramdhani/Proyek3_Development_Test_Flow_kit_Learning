@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import Sidebar from "../components/custom/SidebarStudent";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { FaSearch } from "react-icons/fa"; // Import search icon
 
 // Define a type for our material data
@@ -127,9 +127,11 @@ const TopicPage: React.FC = () => {
                   <div className="w-4/12 font-bold text-gray-800">{material.nama}</div>
                   <div className="w-6/12 text-sm text-gray-600">{material.deskripsi}</div>
                   <div className="w-2/12 flex justify-center">
-                    <button className="bg-blue-800 text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700">
-                      Lihat Materi
-                    </button>
+                    <Link to={`/materi/${material.id}`}>
+                      <button className="bg-blue-800 text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700">
+                        Lihat Materi
+                      </button>
+                    </Link>
                   </div>
                 </div>
               ))}

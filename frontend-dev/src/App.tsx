@@ -18,6 +18,7 @@ import ProgressStudentPage from "./pages/ProgressStudentPage";
 import StudentPage from "./pages/StudentPage";
 import AddTopicPage from "./pages/AddTopicPage";
 import TopicPage from "./pages/TopicPage";
+import MateriPage from "./pages/MateriPage";
 
 
 function App() {
@@ -43,6 +44,7 @@ function App() {
         <Route path="/data-mahasiswa" element={<StudentPage />} />
         <Route path="/add-topics" element={<AddTopicPage />} />
         <Route path="/topic" element={<TopicPage />} />
+        <Route path="/materi/:materiId" element={<MateriPage />} />
       </Routes>
     </BrowserRouter>
   );
