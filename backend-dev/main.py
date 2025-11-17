@@ -22,6 +22,9 @@ import uvicorn
 import locale
 import os
 
+from sqlalchemy.sql import text
+from config.database import conn
+
 # --- Locale: aman untuk Windows & Linux ---
 try:
     # Linux/macOS
@@ -80,42 +83,43 @@ async def root():
 # --- ADD THIS TO main.py ---
 
 # This is a new endpoint for your MateriPage
+# --- 2. THIS FUNCTION IS NOW REPLACED ---
+# It now queries your ms_topik and ms_materi tables
 @app.get("/api/topik-pembelajaran")
 def get_topik_pembelajaran():
-    # This is dummy data. Later, you will get this from your database.
-    dummy_data = [
-        {
-            "id": "1",
-            "nama": "Pemrograman Berbasis Objek",
-            "deskripsi": "Pemrograman Berbasis Objek mendalami studi dimana pada suatu bahasa pemrograman, Objek menjadi orientasi utama dari suatu algoritma",
-            "type": "topic"
-        },
-        {
-            "id": "2",
-            "nama": "Komputer Grafik",
-            "deskripsi": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua",
-            "type": "topic"
-        },
-        {
-            "id": "3",
-            "nama": "Matematika Diskrit",
-            "deskripsi": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua",
-            "type": "text"
-        },
-        {
-            "id": "4V",
-            "nama": "Proyek 3",
-            "deskripsi": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua",
-            "type": "pdf"
-        },
-        {
-            "id": "5",
-            "nama": "Basis Data",
-            "deskripsi": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua",
-            "type": "video"
-        }
-    ]
-    return {"topik": dummy_data}
+    # This SQL query combines your topics and materials tables
+    # It also determines the 'type' of material based on which column has data
+    sql_query = text("""
+        (SELECT 
+            id_topik AS id, 
+            nama_topik AS nama, 
+            deskripsi_topik AS deskripsi, 
+            'topic' AS type 
+         FROM ms_topik 
+         WHERE status_tayang = 1)
+        
+        UNION ALL
+        
+        (SELECT 
+            id_materi AS id, 
+            judul_materi AS nama, 
+            deskripsi_materi AS deskripsi, 
+            CASE 
+                WHEN video_materi IS NOT NULL THEN 'video'
+                WHEN file_materi IS NOT NULL THEN 'pdf'
+                ELSE 'text'
+            END AS type
+         FROM ms_materi)
+    """)
+    
+    # Execute the query and fetch all results
+    try:
+        results = conn.execute(sql_query).mappings().all()
+        return {"topik": results}
+    except Exception as e:
+        # Handle database errors
+        return {"error": str(e)}
+# --- END REPLACED FUNCTION ---
 
 # --- Jadwal (nonaktif, aktifkan kalau diperlukan) ---
 # @app.on_event('startup')
