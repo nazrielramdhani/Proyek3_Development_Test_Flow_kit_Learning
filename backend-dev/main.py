@@ -80,6 +80,21 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 async def root():
     return {"message": "SAS API version 1.1"}
 
+
+@app.post("/api/topik/increment/{id_topik}")
+def increment_topic_view(id_topik: str):
+    try:
+        # Define the SQL query to increment the count
+        sql_update = text("UPDATE ms_topik SET jml_mahasiswa = jml_mahasiswa + 1 WHERE id_topik = :id")
+        
+        # Execute the update, passing the id_topik from the URL
+        conn.execute(sql_update, {"id": id_topik})
+        
+        return {"status": "success", "message": f"Count for {id_topik} incremented."}
+    except Exception as e:
+        # Handle database errors
+        return {"status": "error", "message": str(e)}
+
 # --- ADD THIS TO main.py ---
 
 # This is a new endpoint for your MateriPage
