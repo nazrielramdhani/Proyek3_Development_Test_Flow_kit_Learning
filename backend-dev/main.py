@@ -78,7 +78,7 @@ async def root():
     return {"message": "SAS API version 1.1"}
 
 
-# --- Jadwal (nonaktif, aktifkan kalau diperlukan) ---
+# --- Jadwal (nonaktif, aktifkan kalau diperlukan) ---k
 # @app.on_event('startup')
 # def init_data():
 #     schedule_init()
