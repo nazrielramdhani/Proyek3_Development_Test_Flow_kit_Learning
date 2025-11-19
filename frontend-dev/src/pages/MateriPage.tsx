@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
+import LayoutForm from "@/pages/LayoutForm";
 import logo_polban from "../assets/logo/polban.png";
 import { ClipLoader } from "react-spinners";
 import ReactPlayer from 'react-player';
@@ -213,19 +214,13 @@ const MateriPage: React.FC = () => {
     );
   }
 
+  // --- Render ---
+  if (isLoading) return <div className="fixed inset-0 flex items-center justify-center bg-white z-50"><ClipLoader size={50} color={"#1e40af"} /></div>;
+  
+  if (error) return <div className="min-h-screen flex items-center justify-center text-red-600">{error}</div>;
+
   return (
-    <div className="min-h-screen w-screen bg-gray-100 flex flex-col font-sans">
-      
-      {/* --- HEADER (Blue Bar) --- */}
-      <header className="flex items-center justify-between w-full px-6 py-3 bg-blue-900 text-white">
-        <div className="flex items-center gap-3">
-          <img src={logo_polban} alt="Polban Logo" className="w-10 h-10" />
-          <h1 className="text-xl font-bold">Coverage Test</h1>
-        </div>
-        <Link to="/topic" className="text-white font-semibold hover:text-gray-200 transition-colors text-sm">
-          Kembali
-        </Link>
-      </header>
+    <LayoutForm screenName={topicData?.nama_topik || "Materi Pembelajaran"}>
 
       {/* --- TOPIC INFO SECTION (Attached to top bar) --- */}
       <div className="bg-white px-6 py-6 shadow-sm">
@@ -242,8 +237,8 @@ const MateriPage: React.FC = () => {
         </p>
       </div>
 
-      <div className="flex-1 max-w-7xl mx-auto w-full px-6 py-8 flex flex-col gap-6">
-        <div className="flex flex-col lg:flex-row gap-6">
+      <div className="flex flex-col md:flex-row w-screen min-h-screen">
+        <div className="flex flex-col md:flex-row w-screen min-h-screen gap-8 ml-10 mr-10 mt-10">
             
           {/* --- LEFT SIDEBAR (Navigation List) --- */}
           <div className="w-full lg:w-64 flex flex-col gap-2">
@@ -360,7 +355,7 @@ const MateriPage: React.FC = () => {
           </div>
         </div>
       </div>
-    </div>
+    </LayoutForm>
   );
 };
 

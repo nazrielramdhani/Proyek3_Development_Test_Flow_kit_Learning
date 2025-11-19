@@ -8,8 +8,6 @@ type Material = {
   id: string;
   nama: string;
   deskripsi: string;
-  type: string;
-  first_materi_id?: string | null;
 };
 
 // This is the new page component
@@ -82,7 +80,8 @@ const TopicPage: React.FC = () => {
 
   return (
     // Use light gray background for the content area
-    <div className="flex h-screen">
+    // Use light gray background for the content area
+    <div className="flex flex-col lg:flex-row w-screen lg:w-screen min-h-screen bg-slate-100">
       <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
       
       {/* This is the main content area for your new page */}
