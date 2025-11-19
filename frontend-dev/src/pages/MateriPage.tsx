@@ -36,12 +36,12 @@ const PdfContent: React.FC<{ content: string }> = ({ content }) => (
 
 const VideoContent: React.FC<{ content: string }> = ({ content }) => (
   <div className="bg-black p-0 rounded-lg shadow-sm flex justify-center items-center min-h-[400px] overflow-hidden">
-    {/* Use ReactPlayer here */}
     <ReactPlayer 
-      url={content} 
-      controls={true}
+      src={content} 
+      controls
+      playing
       width="100%"
-      height="400px" // Or whatever height you prefer
+      height="400px"
     />
   </div>
 );
