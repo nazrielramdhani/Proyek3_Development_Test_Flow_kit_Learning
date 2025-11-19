@@ -22,6 +22,9 @@ import uvicorn
 import locale
 import os
 
+from sqlalchemy.sql import text
+from config.database import conn
+
 # --- Locale: aman untuk Windows & Linux ---
 try:
     # Linux/macOS
@@ -78,7 +81,70 @@ async def root():
     return {"message": "SAS API version 1.1"}
 
 
-# --- Jadwal (nonaktif, aktifkan kalau diperlukan) ---k
+@app.post("/api/topik/increment/{id_topik}")
+def increment_topic_view(id_topik: str):
+    try:
+        # Define the SQL query to increment the count
+        sql_update = text("UPDATE ms_topik SET jml_mahasiswa = jml_mahasiswa + 1 WHERE id_topik = :id")
+        
+        # Execute the update, passing the id_topik from the URL
+        conn.execute(sql_update, {"id": id_topik})
+        
+        return {"status": "success", "message": f"Count for {id_topik} incremented."}
+    except Exception as e:
+        # Handle database errors
+        return {"status": "error", "message": str(e)}
+
+@app.get("/api/topik-pembelajaran")
+def get_topik_pembelajaran():
+    # Updated query: ONLY fetch from ms_topik
+    # We removed the 'UNION ALL' part that was pulling from ms_materi
+    sql_query = text("""
+        SELECT 
+            t.id_topik AS id, 
+            t.nama_topik AS nama, 
+            t.deskripsi_topik AS deskripsi, 
+            'topic' AS type,
+            (SELECT tm.id_materi 
+             FROM topik_materi tm 
+             WHERE tm.id_topik = t.id_topik 
+             ORDER BY tm.created_at ASC 
+             LIMIT 1) AS first_materi_id
+        FROM ms_topik t
+        WHERE t.status_tayang = 1
+    """)
+    
+    try:
+        results = conn.execute(sql_query).mappings().all()
+        return {"topik": results}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/api/topik/{id_topik}/materials")
+def get_materials_by_topic(id_topik: str):
+    sql_query = text("""
+        SELECT 
+            m.id_materi AS id,
+            m.judul_materi AS title,
+            m.deskripsi_materi AS description,  -- <--- ADD THIS LINE
+            CASE 
+                WHEN m.video_materi IS NOT NULL THEN 'video'
+                WHEN m.file_materi IS NOT NULL THEN 'pdf'
+                ELSE 'text'
+            END AS type,
+            COALESCE(m.text_materi, m.file_materi, m.video_materi) AS content
+        FROM ms_materi m
+        JOIN topik_materi tm ON m.id_materi = tm.id_materi
+        WHERE tm.id_topik = :id_topik
+        ORDER BY tm.created_at ASC
+    """)
+    try:
+        results = conn.execute(sql_query, {"id_topik": id_topik}).mappings().all()
+        return {"materials": results}
+    except Exception as e:
+        return {"error": str(e)}
+# --- Jadwal (nonaktif, aktifkan kalau diperlukan) ---
 # @app.on_event('startup')
 # def init_data():
 #     schedule_init()
