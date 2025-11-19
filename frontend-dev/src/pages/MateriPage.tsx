@@ -4,6 +4,7 @@ import LayoutForm from "@/pages/LayoutForm";
 import logo_polban from "../assets/logo/polban.png";
 import { ClipLoader } from "react-spinners";
 import ReactPlayer from 'react-player';
+import { PDFViewer } from "@/components/custom/PDFViewer";
 
 // --- Types ---
 type MaterialData = {
@@ -28,11 +29,18 @@ const TextContent: React.FC<{ content: string }> = ({ content }) => (
   </div>
 );
 
-const PdfContent: React.FC<{ content: string }> = ({ content }) => (
-  <div className="bg-gray-100 p-4 rounded-lg shadow-sm h-[600px]">
-    <iframe src={content} width="100%" height="100%" title="pdf-viewer" className="rounded border-0"/>
-  </div>
-);
+const PdfContent: React.FC<{ content: string }> = ({ content }) => {
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+  const pdfUrl = `${apiUrl}/files/${content}`;
+  
+  console.log('PDF URL:', pdfUrl);
+  
+  return (
+    <div className="bg-gray-50 rounded-lg shadow-sm">
+      <PDFViewer fileUrl={pdfUrl} fileName={content} />
+    </div>
+  );
+};
 
 const VideoContent: React.FC<{ content: string }> = ({ content }) => (
   <div className="bg-black p-0 rounded-lg shadow-sm flex justify-center items-center min-h-[400px] overflow-hidden">
