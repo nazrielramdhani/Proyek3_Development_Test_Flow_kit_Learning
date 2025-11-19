@@ -17,6 +17,8 @@ import GradeStudentPage from "./pages/GradeStudentPage";
 import ProgressStudentPage from "./pages/ProgressStudentPage";
 import StudentPage from "./pages/StudentPage";
 import AddTopicPage from "./pages/AddTopicPage";
+import ListLearningTopicsPage from "./pages/ListLearningTopicsPage";
+import ListMateriPage from "./pages/ListMateriPage";
 
 function App() {
   return (
@@ -40,6 +42,8 @@ function App() {
         <Route path="/progress" element={<ProgressStudentPage />} />
         <Route path="/data-mahasiswa" element={<StudentPage />} />
         <Route path="/add-topics" element={<AddTopicPage />} />
+        <Route path="/learning-topics" element={<ListLearningTopicsPage />} />
+        <Route path="/learning-materi" element={<ListMateriPage />} />
       </Routes>
     </BrowserRouter>
   );
