@@ -12,6 +12,8 @@ from routes.topik import topik
 from routes.combo import combo
 from routes.grade import grade
 from routes.progress import progress
+# new routes
+from routes.materi_pembelajaran import materi_pembelajaran
 
 from jobs.schedule import schedule_init, schedule_run_uncomplete, schedule_run_alpha
 from jobs.train_model import run_train_model
@@ -62,6 +64,8 @@ app.include_router(topik)
 app.include_router(combo)
 app.include_router(grade)
 app.include_router(progress)
+#new router
+app.include_router(materi_pembelajaran)
 # app.include_router(cfg)
 
 app = cors_headers(app)
