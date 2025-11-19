@@ -44,7 +44,7 @@ function App() {
         <Route path="/data-mahasiswa" element={<StudentPage />} />
         <Route path="/add-topics" element={<AddTopicPage />} />
         <Route path="/topic" element={<TopicPage />} />
-        <Route path="/materi/:materiId" element={<MateriPage />} />
+        <Route path="/topic/:topicId/materi/:materiId" element={<MateriPage />} />
       </Routes>
     </BrowserRouter>
   );

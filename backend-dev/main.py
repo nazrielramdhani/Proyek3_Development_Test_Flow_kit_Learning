@@ -95,47 +95,55 @@ def increment_topic_view(id_topik: str):
         # Handle database errors
         return {"status": "error", "message": str(e)}
 
-# --- ADD THIS TO main.py ---
-
-# This is a new endpoint for your MateriPage
-# --- 2. THIS FUNCTION IS NOW REPLACED ---
-# It now queries your ms_topik and ms_materi tables
 @app.get("/api/topik-pembelajaran")
 def get_topik_pembelajaran():
-    # This SQL query combines your topics and materials tables
-    # It also determines the 'type' of material based on which column has data
+    # Updated query: ONLY fetch from ms_topik
+    # We removed the 'UNION ALL' part that was pulling from ms_materi
     sql_query = text("""
-        (SELECT 
-            id_topik AS id, 
-            nama_topik AS nama, 
-            deskripsi_topik AS deskripsi, 
-            'topic' AS type 
-         FROM ms_topik 
-         WHERE status_tayang = 1)
-        
-        UNION ALL
-        
-        (SELECT 
-            id_materi AS id, 
-            judul_materi AS nama, 
-            deskripsi_materi AS deskripsi, 
-            CASE 
-                WHEN video_materi IS NOT NULL THEN 'video'
-                WHEN file_materi IS NOT NULL THEN 'pdf'
-                ELSE 'text'
-            END AS type
-         FROM ms_materi)
+        SELECT 
+            t.id_topik AS id, 
+            t.nama_topik AS nama, 
+            t.deskripsi_topik AS deskripsi, 
+            'topic' AS type,
+            (SELECT tm.id_materi 
+             FROM topik_materi tm 
+             WHERE tm.id_topik = t.id_topik 
+             ORDER BY tm.created_at ASC 
+             LIMIT 1) AS first_materi_id
+        FROM ms_topik t
+        WHERE t.status_tayang = 1
     """)
     
-    # Execute the query and fetch all results
     try:
         results = conn.execute(sql_query).mappings().all()
         return {"topik": results}
     except Exception as e:
-        # Handle database errors
         return {"error": str(e)}
-# --- END REPLACED FUNCTION ---
 
+
+@app.get("/api/topik/{id_topik}/materials")
+def get_materials_by_topic(id_topik: str):
+    sql_query = text("""
+        SELECT 
+            m.id_materi AS id,
+            m.judul_materi AS title,
+            m.deskripsi_materi AS description,  -- <--- ADD THIS LINE
+            CASE 
+                WHEN m.video_materi IS NOT NULL THEN 'video'
+                WHEN m.file_materi IS NOT NULL THEN 'pdf'
+                ELSE 'text'
+            END AS type,
+            COALESCE(m.text_materi, m.file_materi, m.video_materi) AS content
+        FROM ms_materi m
+        JOIN topik_materi tm ON m.id_materi = tm.id_materi
+        WHERE tm.id_topik = :id_topik
+        ORDER BY tm.created_at ASC
+    """)
+    try:
+        results = conn.execute(sql_query, {"id_topik": id_topik}).mappings().all()
+        return {"materials": results}
+    except Exception as e:
+        return {"error": str(e)}
 # --- Jadwal (nonaktif, aktifkan kalau diperlukan) ---
 # @app.on_event('startup')
 # def init_data():

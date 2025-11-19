@@ -8,6 +8,8 @@ type Material = {
   id: string;
   nama: string;
   deskripsi: string;
+  type: string;
+  first_materi_id?: string | null;
 };
 
 // This is the new page component
@@ -90,7 +92,7 @@ const TopicPage: React.FC = () => {
         } flex flex-col`}
       >
         {/* --- Header Bar --- */}
-        <div className="w-[100%] bg-white p-4 shadow">
+        <div className="w-full bg-white p-4 shadow">
           <div className="max-w-screen-xl mx-auto">
             <h1 className="text-xl font-bold text-blue-800 mb-6 mt-4">
               Topik Pembelajaran
@@ -110,7 +112,7 @@ const TopicPage: React.FC = () => {
 
 
         <div className="flex-1 p-6 overflow-auto">
-          <div className="max-w-[10000px] mx-auto">
+          <div className="max-w-full mx-auto">
 
             <div className="flex text-sm font-semibold text-gray-500 px-4 mb-2">
               <div className="w-4/12">Nama Topik</div>
@@ -127,11 +129,29 @@ const TopicPage: React.FC = () => {
                   <div className="w-4/12 font-bold text-gray-800">{material.nama}</div>
                   <div className="w-6/12 text-sm text-gray-600">{material.deskripsi}</div>
                   <div className="w-2/12 flex justify-center">
-                    <Link to={`/materi/${material.id}`}>
+                    {material.type === 'topic' ? (
+                      material.first_materi_id ? (
+                        /* Case 1: Topic HAS materials -> Go to first material */
+                        <Link to={`/topic/${material.id}/materi/${material.first_materi_id}`}>
+                          <button className="bg-blue-800 text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700">
+                            Lihat Materi
+                          </button>
+                        </Link>
+                      ) : (
+                        /* Case 2: Topic is EMPTY -> Disabled Button */
+                        <button 
+                          disabled 
+                          className="bg-gray-300 text-gray-500 px-6 py-2 rounded-lg text-sm font-semibold cursor-not-allowed"
+                        >
+                          Belum Ada
+                        </button>
+                      )
+                    ) : (
+                      /* Case 3: Not a topic (e.g. single file) */
                       <button className="bg-blue-800 text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700">
-                        Lihat Materi
+                        Preview
                       </button>
-                    </Link>
+                    )}
                   </div>
                 </div>
               ))}
