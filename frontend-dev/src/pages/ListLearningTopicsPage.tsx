@@ -66,7 +66,7 @@ const ListLearningTopicTable: React.FC = () => {
   };
 
   const handleAddTopic = () => {
-    navigate('/add-topics');
+    navigate('/add-topic');
   };
 
   const handleEditTopic = (id: string) => {
