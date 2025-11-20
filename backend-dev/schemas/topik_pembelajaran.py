@@ -1,39 +1,23 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
-from datetime import datetime
 
+# Schema untuk membuat data topik baru (digunakan pada endpoint CREATE)
+class TopikCreate(BaseModel):
+    nama_topik: str = Field(..., max_length=255)
+    deskripsi_topik: Optional[str] = None
 
-# ==========================================================
-# Base Schema untuk Read (response)
-# ==========================================================
-class TopikPembelajaranBase(BaseModel):
+# Schema untuk meng-update data topik (digunakan pada endpoint UPDATE)
+# Memerlukan id_topik sebagai identitas data yang ingin diubah
+class TopikUpdate(BaseModel):
+    id_topik: str
+    nama_topik: Optional[str] = None
+    deskripsi_topik: Optional[str] = None
+
+# Schema untuk mengembalikan data topik ke client (digunakan pada endpoint GET)
+# Berisi semua field yang biasanya ditampilkan saat membaca data
+class TopikOut(BaseModel):
     id_topik: str
     nama_topik: str
-    jml_mahasiswa: Optional[int] = None
-    deskripsi_topik: Optional[str] = None
+    deskripsi_topik: Optional[str]
+    jml_mahasiswa: Optional[int]
     status_tayang: int
-    created_at: datetime
-    updated_at: datetime
-
-    class Config:
-        orm_mode = True
-
-
-# ==========================================================
-# Schema untuk Create
-# ==========================================================
-class TopikPembelajaranCreate(BaseModel):
-    nama_topik: str
-    jml_mahasiswa: Optional[int] = None
-    deskripsi_topik: Optional[str] = None
-    status_tayang: Optional[int] = 0
-
-
-# ==========================================================
-# Schema untuk Update
-# ==========================================================
-class TopikPembelajaranUpdate(BaseModel):
-    nama_topik: Optional[str] = None
-    jml_mahasiswa: Optional[int] = None
-    deskripsi_topik: Optional[str] = None
-    status_tayang: Optional[int] = None

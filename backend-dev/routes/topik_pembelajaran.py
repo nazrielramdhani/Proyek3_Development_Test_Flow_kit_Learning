@@ -1,111 +1,127 @@
-# routes/topik_pembelajaran.py
-
-from fastapi import APIRouter, HTTPException
-from typing import List
+from fastapi import APIRouter, HTTPException, Query
+from config.database import conn
+from schemas.topik_pembelajaran import TopikCreate, TopikUpdate, TopikOut
 from models.topik_pembelajaran import TopikPembelajaran
-from database import database
-from schemas.topik_pembelajaran import (
-    TopikPembelajaranCreate,
-    TopikPembelajaranUpdate,
-    TopikPembelajaranResponse
-)
+from models.topik_materi import TopikMateri
+from models.student_access import StudentAccess
+from sqlalchemy import select, text
+import uuid
 
-router = APIRouter(
-    prefix="/topik",
-    tags=["Topik Pembelajaran"]
-)
+router = APIRouter(prefix="", tags=["topik_pembelajaran"])
 
+# ============================================================
+# GET LIST TOPIK PEMBELAJARAN
+# ============================================================
+@router.get("/topik-pembelajaran", response_model=list[TopikOut])
+def list_topik():
+    # Mengambil semua data topik
+    q = select(TopikPembelajaran)
+    res = conn.execute(q).mappings().all()
+    return [dict(r) for r in res]
 
-# ==========================================================
-# GET /topik → Ambil semua topik
-# ==========================================================
-@router.get("/", response_model=List[TopikPembelajaranResponse])
-async def get_all_topik():
-    query = TopikPembelajaran.select()
-    return await database.fetch_all(query)
+# ============================================================
+# CREATE TOPIK PEMBELAJARAN
+# ============================================================
+@router.post("/topik-pembelajaran")
+def create_topik(payload: TopikCreate):
+    # Generate UUID untuk id_topik
+    id_ = str(uuid.uuid4())
 
-
-# ==========================================================
-# GET /topik/{id_topik} → Ambil 1 topik
-# ==========================================================
-@router.get("/{id_topik}", response_model=TopikPembelajaranResponse)
-async def get_topik(id_topik: str):
-    query = TopikPembelajaran.select().where(
-        TopikPembelajaran.c.id_topik == id_topik
-    )
-    result = await database.fetch_one(query)
-
-    if not result:
-        raise HTTPException(status_code=404, detail="Topik tidak ditemukan")
-
-    return result
-
-
-# ==========================================================
-# POST /topik → Tambah topik baru
-# ==========================================================
-@router.post("/", response_model=TopikPembelajaranResponse)
-async def create_topik(topik: TopikPembelajaranCreate):
-    query = TopikPembelajaran.insert().values(
-        id_topik=topik.id_topik,
-        nama_topik=topik.nama_topik,
-        jml_mahasiswa=topik.jml_mahasiswa,
-        deskripsi_topik=topik.deskripsi_topik,
-        status_tayang=topik.status_tayang,
+    # Query INSERT untuk menambah topik baru
+    ins = TopikPembelajaran.insert().values(
+        id_topik=id_, 
+        nama_topik=payload.nama_topik, 
+        deskripsi_topik=payload.deskripsi_topik
     )
 
-    await database.execute(query)
+    conn.execute(ins)
 
-    return topik
+    return {"status": "ok", "id_topik": id_}
 
+# ============================================================
+# UPDATE TOPIK PEMBELAJARAN (UPDATE FIELD TERTENTU)
+# ============================================================
+@router.put("/topik-pembelajaran")
+def update_topik(payload: TopikUpdate):
 
-# ==========================================================
-# PUT /topik/{id_topik} → Update topik
-# ==========================================================
-@router.put("/{id_topik}", response_model=TopikPembelajaranResponse)
-async def update_topik(id_topik: str, topik: TopikPembelajaranUpdate):
-    # cek apakah data ada
-    find_query = TopikPembelajaran.select().where(
-        TopikPembelajaran.c.id_topik == id_topik
-    )
-    existing = await database.fetch_one(find_query)
+    # Ambil hanya field yang tidak None dan bukan id_topik
+    upd_vals = {k: v for k, v in payload.dict().items() if v is not None and k != "id_topik"}
 
-    if not existing:
-        raise HTTPException(status_code=404, detail="Topik tidak ditemukan")
+    # Jika tidak ada perubahan, langsung return
+    if not upd_vals:
+        return {"status": "nochange"}
 
-    # update
-    update_query = TopikPembelajaran.update().where(
-        TopikPembelajaran.c.id_topik == id_topik
-    ).values(
-        nama_topik=topik.nama_topik,
-        jml_mahasiswa=topik.jml_mahasiswa,
-        deskripsi_topik=topik.deskripsi_topik,
-        status_tayang=topik.status_tayang,
-    )
+    # Query UPDATE berdasarkan id_topik
+    upd = TopikPembelajaran.update()\
+        .where(TopikPembelajaran.c.id_topik == payload.id_topik)\
+        .values(**upd_vals)
 
-    await database.execute(update_query)
+    conn.execute(upd)
+    return {"status": "ok"}
 
-    updated = await database.fetch_one(find_query)
-    return updated
+# ============================================================
+# PUBLISH TOPIK (SET status_tayang = 1)
+# ============================================================
+@router.put("/topik-pembelajaran/publish")
+def publish_topik(id_topik: str = Query(...)):
+    # Update status topik menjadi 1 (published)
+    upd = TopikPembelajaran.update()\
+        .where(TopikPembelajaran.c.id_topik == id_topik)\
+        .values(status_tayang=1)
 
+    conn.execute(upd)
+    return {"status": "ok"}
 
-# ==========================================================
-# DELETE /topik/{id_topik} → Hapus topik
-# ==========================================================
-@router.delete("/{id_topik}")
-async def delete_topik(id_topik: str):
-    # cek dulu apakah ada datanya
-    find_query = TopikPembelajaran.select().where(
-        TopikPembelajaran.c.id_topik == id_topik
-    )
-    existing = await database.fetch_one(find_query)
+# ============================================================
+# TAKE DOWN TOPIK (SET status_tayang = 0)
+# Hanya boleh jika belum pernah diakses mahasiswa
+# ============================================================
+@router.put("/topik-pembelajaran/takedown")
+def takedown_topik(id_topik: str = Query(...)):
 
-    if not existing:
-        raise HTTPException(status_code=404, detail="Topik tidak ditemukan")
+    # Cek apakah topik sudah pernah diakses oleh mahasiswa
+    q = select(StudentAccess).where(StudentAccess.c.id_topik == id_topik)
+    rows = conn.execute(q).first()
 
-    delete_query = TopikPembelajaran.delete().where(
-        TopikPembelajaran.c.id_topik == id_topik
-    )
-    await database.execute(delete_query)
+    # Jika pernah diakses → tidak boleh di-takedown
+    if rows:
+        raise HTTPException(
+            status_code=400, 
+            detail="Tidak bisa take down: sudah diakses oleh mahasiswa"
+        )
 
-    return {"message": "Topik berhasil dihapus"}
+    # Jika aman → lakukan update status_tayang = 0
+    upd = TopikPembelajaran.update()\
+        .where(TopikPembelajaran.c.id_topik == id_topik)\
+        .values(status_tayang=0)
+
+    conn.execute(upd)
+    return {"status": "ok"}
+
+# ============================================================
+# LIST MATERI DALAM SATU TOPIK
+# ============================================================
+@router.get("/topik-pembelajaran/{id_topik}/materi")
+def list_materi_for_topik(id_topik: str):
+
+    # Query raw SQL untuk mendapatkan semua materi terkait topik
+    sql = text("""
+        SELECT m.* FROM ms_materi m
+        JOIN topik_materi tm ON tm.id_materi = m.id_materi
+        WHERE tm.id_topik = :id
+    """)
+
+    rows = conn.execute(sql, {"id": id_topik}).mappings().all()
+    return {"data": [dict(r) for r in rows]}
+
+# ============================================================
+# TAMBAHKAN MATERI KE DALAM TOPIK
+# ============================================================
+@router.post("/topik-pembelajaran/{id_topik}/materi")
+def add_materi_to_topik(id_topik: str, id_materi: str):
+
+    # Insert relasi topik → materi ke tabel topik_materi
+    ins = TopikMateri.insert().values(id_topik=id_topik, id_materi=id_materi)
+
+    conn.execute(ins)
+    return {"status":"ok"}
