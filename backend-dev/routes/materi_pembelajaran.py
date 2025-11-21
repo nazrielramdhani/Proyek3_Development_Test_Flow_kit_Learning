@@ -13,24 +13,30 @@ router = APIRouter(prefix="", tags=["materi_pembelajaran"])
 # ============================================================
 # CREATE — Menambahkan materi pembelajaran baru
 # ============================================================
-@router.post("/materi")
-def create_materi(payload: MateriCreate):
-    # Generate ID unik untuk materi
-    id_ = str(uuid.uuid4())
+@router.get("/materi")
+def list_materi(keyword: str = "", page: int = 1, limit: int = 10):
+    offset = (page - 1) * limit
 
-    # Query insert ke database
-    ins = MateriPembelajaran.insert().values(
-        id_materi=id_,
-        judul_materi=payload.judul_materi,
-        deskripsi_materi=payload.deskripsi_materi,
-        file_materi=payload.file_materi,
-        text_materi=payload.text_materi,
-        video_materi=payload.video_materi
+    base_query = select(MateriPembelajaran).where(
+        MateriPembelajaran.c.judul_materi.like(f"%{keyword}%")
     )
-    conn.execute(ins)
 
-    # Response sukses
-    return {"status": "ok", "id_materi": id_}
+    # Hitung total data
+    count_query = text(f"""
+        SELECT COUNT(*) FROM ms_materi
+        WHERE judul_materi LIKE :keyword
+    """)
+    total_data = conn.execute(count_query, {"keyword": f"%{keyword}%"}).scalar()
+    max_page = (total_data // limit) + (1 if total_data % limit > 0 else 0)
+
+    # Query data per halaman
+    data_query = base_query.limit(limit).offset(offset)
+    rows = conn.execute(data_query).mappings().all()
+
+    return {
+        "data": rows,
+        "max_page": max_page
+    }
 
 
 # ============================================================
