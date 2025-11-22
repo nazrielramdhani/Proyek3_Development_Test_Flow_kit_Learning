@@ -8,6 +8,7 @@ class MateriCreate(BaseModel):
     file_materi: Optional[str] = None
     text_materi: Optional[str] = None
     video_materi: Optional[str] = None
+    jenis_materi: Optional[str] = "default"  
 
 # Schema untuk update materi (request body PUT)
 class MateriUpdate(BaseModel):
@@ -17,6 +18,7 @@ class MateriUpdate(BaseModel):
     file_materi: Optional[str] = None
     text_materi: Optional[str] = None
     video_materi: Optional[str] = None
+    jenis_materi: Optional[str] = None 
 
 # Schema output materi ke frontend (response format)
 class MateriOut(BaseModel):
@@ -27,3 +29,4 @@ class MateriOut(BaseModel):
     text_materi: Optional[str]
     video_materi: Optional[str]
     jml_mahasiswa: Optional[int]
+    jenis_materi: Optional[str] 

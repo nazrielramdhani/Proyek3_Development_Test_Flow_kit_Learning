@@ -55,11 +55,11 @@ const ListLearningTopicsPage: React.FC = () => {
   };
 
   const handleAddTopic = () => {
-    navigate('/add-topics');
+    navigate('/Topic-Detail');
   };
 
   const handleEditTopic = (id:string) => {
-    navigate(`/add-topics?id_topik=${id}`);
+    navigate(`/Topic-Detail=${id}`);
   };
 
   const confirmDelete = () => {

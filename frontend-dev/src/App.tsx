@@ -16,10 +16,10 @@ import AccessTopicsPage from "./pages/AccessTopicsPage";
 import GradeStudentPage from "./pages/GradeStudentPage";
 import ProgressStudentPage from "./pages/ProgressStudentPage";
 import StudentPage from "./pages/StudentPage";
-import TopicDetailPages from "./pages/TopikDetailPage"; //Seruni nambahin ini
-// import AddTopicPage from "./pages/AddMateriDialog";
+import AddTopicPage from "./pages/AddTopicPage";
 import ListLearningTopicsPage from "./pages/ListLearningTopicsPage";
 import ListMateriPage from "./pages/ListMateriPage";
+import TopicDetailPage from "./pages/TopikDetailPage";
 
 function App() {
   return (
@@ -42,9 +42,10 @@ function App() {
         <Route path="/grade" element={<GradeStudentPage />} />
         <Route path="/progress" element={<ProgressStudentPage />} />
         <Route path="/data-mahasiswa" element={<StudentPage />} />
-        <Route path="/add-topics" element={<TopicDetailPages />} /> {/* --- sernui namnahin ini --- */}
+        <Route path="/add-topics" element={<AddTopicPage />} />
         <Route path="/learning-topics" element={<ListLearningTopicsPage />} />
         <Route path="/learning-materi" element={<ListMateriPage />} />
+        <Route path="/Topic-Detail" element={<TopicDetailPage />} />
       </Routes>
     </BrowserRouter>
   );

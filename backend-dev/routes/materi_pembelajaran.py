@@ -1,7 +1,6 @@
-# routes/materi_pembelajaran.py
 from fastapi import APIRouter, HTTPException, Query, Path
 from config.database import conn
-from schemas.materi_pembelajaran import MateriCreate, MateriUpdate
+from schemas.materi_pembelajaran import MateriCreate, MateriUpdate, MateriOut
 from models.materi_pembelajaran import MateriPembelajaran
 from sqlalchemy import select, text
 import uuid
@@ -23,6 +22,7 @@ def create_materi(payload: MateriCreate):
         id_materi=id_,
         judul_materi=payload.judul_materi,
         deskripsi_materi=payload.deskripsi_materi,
+        jenis_materi=payload.jenis_materi,   # menyimpan jenis materi jika ada
         file_materi=payload.file_materi,
         text_materi=payload.text_materi,
         video_materi=payload.video_materi
@@ -36,18 +36,19 @@ def create_materi(payload: MateriCreate):
 # ============================================================
 # READ — Mengambil seluruh data materi pembelajaran
 # ============================================================
-@router.get("/materi")
+@router.get("/materi", response_model=list[MateriOut])
 def list_all_materi():
     # Select semua kolom dari tabel ms_materi
     q = select(MateriPembelajaran)
     rows = conn.execute(q).mappings().all()
-    return rows
+    # Return list of dict agar frontend menerima JSON murni
+    return [dict(r) for r in rows]
 
 
 # ============================================================
 # READ by ID — Mengambil 1 materi berdasarkan id_materi
 # ============================================================
-@router.get("/materi/{id_materi}")
+@router.get("/materi/{id_materi}", response_model=MateriOut)
 def get_materi(id_materi: str):
     # Query mencari materi berdasarkan ID
     q = select(MateriPembelajaran).where(MateriPembelajaran.c.id_materi == id_materi)
