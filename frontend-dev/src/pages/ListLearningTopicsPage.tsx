@@ -49,6 +49,10 @@ const ListLearningTopicsPage: React.FC = () => {
     publishTopik(id);
   };
 
+  const handleToggleTakedown = (id: string) => {
+    takedownTopik(id);
+  };
+
   const handleDelete = (id: string) => {
     setShowConfirmation(true);
     setTopicToDelete(id);
@@ -59,7 +63,8 @@ const ListLearningTopicsPage: React.FC = () => {
   };
 
   const handleEditTopic = (id:string) => {
-    navigate(`/Topic-Detail=${id}`);
+    // buka halaman detail/edit dengan query param id_topik
+    navigate(`/Topic-Detail?id_topik=${encodeURIComponent(id)}`);
   };
 
   const confirmDelete = () => {
@@ -77,7 +82,7 @@ const ListLearningTopicsPage: React.FC = () => {
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
-    setCurrentPage(1); 
+    setCurrentPage(1);
     fetchDataTopik(1, e.target.value, orderBy, order);
   };
 
@@ -86,7 +91,6 @@ const ListLearningTopicsPage: React.FC = () => {
     setCurrentPage(page);
     setSearchQuery(keyword);
 
-    // endpoint topik pembelajaran (backend)
     const url = `${apiUrl}/topik-pembelajaran`;
 
     try {
@@ -108,7 +112,6 @@ const ListLearningTopicsPage: React.FC = () => {
       }
 
       const data = await response.json(); // diasumsikan array topik
-      // map sesuai interface LearningTopic
       const temp: LearningTopic[] = (data || []).map((t:any) => ({
         id: t.id_topik ?? t.ms_id_topik,
         name: t.nama_topik ?? t.ms_nama_topik,
@@ -122,67 +125,113 @@ const ListLearningTopicsPage: React.FC = () => {
     } catch (error) {
       console.error('Error fetching topik pembelajaran:', error);
       setTopics([]);
+      setErrorMessage('Gagal mengambil data topik');
+      setTimeout(()=>setErrorMessage(''), 3000);
     }
   };
 
+  // --- Publish (menggunakan query param sesuai backend) ---
   const publishTopik = async (id:string) => {
     try {
-      let param = { id_topik: id }
-      // gunakan endpoint topik pembelajaran publish/takedown jika tersedia
-      const response = await fetch(`${apiUrl}/topik-pembelajaran/publish`, {
+      const url = `${apiUrl}/topik-pembelajaran/publish?id_topik=${encodeURIComponent(id)}`;
+      const response = await fetch(url, {
         method: 'PUT',
         headers: {
           'Accept': 'application/json',
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`
-        },
-        body:JSON.stringify(param)
+        }
       });
 
       if (!response.ok) {
-        if (response.status === 403) navigate('/error');
-        else {
+        if (response.status === 403) {
+          navigate('/error');
+          return;
+        } else {
           const d = await response.json().catch(()=>null);
-          setErrorMessage(d?.message || 'Gagal publish topik');
-          setTimeout(()=>setErrorMessage(''), 3000);
+          setErrorMessage(d?.detail || d?.message || 'Gagal publish topik');
+          setTimeout(()=>setErrorMessage(''), 3500);
+          return;
         }
-      } else {
-        fetchDataTopik(currentPage,searchQuery,orderBy, order)
       }
+
+      setInfoMessage('Topik berhasil dipublish');
+      setTimeout(()=>setInfoMessage(''), 2000);
+      fetchDataTopik(currentPage,searchQuery,orderBy, order)
     } catch (error) {
       console.error('Error publish:', error);
+      setErrorMessage('Terjadi kesalahan saat publish');
+      setTimeout(()=>setErrorMessage(''), 3000);
     }
   };
 
-  const deleteDataTopik = async (id:string) => {
+  // --- Takedown (menggunakan query param sesuai backend) ---
+  const takedownTopik = async (id:string) => {
     try {
-      let param = { id_topik: id }
-      const response = await fetch(`${apiUrl}/topik/deleteTopik`, {
-        method: 'DELETE',
+      const url = `${apiUrl}/topik-pembelajaran/takedown?id_topik=${encodeURIComponent(id)}`;
+      const response = await fetch(url, {
+        method: 'PUT',
         headers: {
           'Accept': 'application/json',
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`
-        },
-        body:JSON.stringify(param)
+        }
       });
 
       if (!response.ok) {
-        if (response.status === 403) navigate('/error');
-        else if (response.status === 500) {
-          const data = await response.json();
-          setErrorMessage(`${data.message}`);
-          setTimeout(() => setErrorMessage(''), 3000);
+        if (response.status === 403) {
+          navigate('/error');
+          return;
+        } else if (response.status === 400) {
+          // backend mengembalikan detail kalau tidak bisa di-takedown
+          const d = await response.json().catch(()=>null);
+          setErrorMessage(d?.detail || d?.message || 'Tidak bisa take down topik');
+          setTimeout(()=>setErrorMessage(''), 4000);
+          return;
+        } else {
+          const d = await response.json().catch(()=>null);
+          setErrorMessage(d?.detail || d?.message || `Gagal takedown (status ${response.status})`);
+          setTimeout(()=>setErrorMessage(''), 3500);
+          return;
         }
-      } else {
-        setInfoMessage("Topik berhasil dihapus.");
-        setTimeout(() => setInfoMessage(''), 3000);
-        fetchDataTopik(currentPage, searchQuery, orderBy,order);
       }
+
+      setInfoMessage('Topik berhasil di-takedown');
+      setTimeout(()=>setInfoMessage(''), 2000);
+      fetchDataTopik(currentPage,searchQuery,orderBy, order)
     } catch (error) {
-      console.error('Error delete topik:', error);
+      console.error('Error takedown:', error);
+      setErrorMessage('Terjadi kesalahan saat takedown');
+      setTimeout(()=>setErrorMessage(''), 3000);
     }
   };
+
+  const deleteDataTopik = async (id: string) => {
+    try {
+      const response = await fetch(
+        `${apiUrl}/topik-pembelajaran?id_topik=${encodeURIComponent(id)}`,
+        {
+          method: "DELETE",
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        setErrorMessage(data?.detail || "Gagal menghapus topik.");
+        setTimeout(() => setErrorMessage(""), 3000);
+        return;
+      }
+
+      setInfoMessage("Topik berhasil dihapus.");
+      setTimeout(() => setInfoMessage(""), 3000);
+      fetchDataTopik(currentPage, searchQuery, orderBy, order);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
 
   useEffect(() => {
     if (session != null){
@@ -194,7 +243,7 @@ const ListLearningTopicsPage: React.FC = () => {
     }else{
       navigate("/login")
     }
-    
+
     const mediaQuery = window.matchMedia("(min-width: 768px)");
     const handleMediaQueryChange = (event: MediaQueryListEvent) => {
       setIsSidebarOpen(event.matches);
@@ -222,12 +271,12 @@ const ListLearningTopicsPage: React.FC = () => {
                   type="text"
                   placeholder="Search or type"
                   value={searchQuery}
-                  onChange={handleSearchChange} 
+                  onChange={handleSearchChange}
                   className="w-full p-2 pl-10 border text-sm border-gray-300 rounded-md"
                 />
                 <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
               </div>
-              <button 
+              <button
                className="flex items-center justify-center text-sm bg-blue-800 text-white py-2 px-3 md:px-4 lg:px-5 rounded hover:bg-blue-700"
                 onClick={handleAddTopic}
               >
@@ -251,6 +300,7 @@ const ListLearningTopicsPage: React.FC = () => {
                 order={order}
                 onSort={handleRequestSort}
                 onTogglePublish={handleTogglePublish}
+                onToggleTakedown={handleToggleTakedown}
                 onDelete={handleDelete}
                 onEdit={handleEditTopic}
               />
@@ -263,10 +313,10 @@ const ListLearningTopicsPage: React.FC = () => {
       </div>
 
       {showConfirmation && (
-        <ConfirmationModal 
-          message="Apakah Anda yakin ingin menghapus topik ini?" 
-          onConfirm={confirmDelete} 
-          onCancel={cancelDelete} 
+        <ConfirmationModal
+          message="Apakah Anda yakin ingin menghapus topik ini?"
+          onConfirm={confirmDelete}
+          onCancel={cancelDelete}
           isSidebarOpen={isSidebarOpen}
         />
       )}

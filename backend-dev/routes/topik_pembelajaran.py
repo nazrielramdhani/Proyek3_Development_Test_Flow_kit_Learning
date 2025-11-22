@@ -125,3 +125,37 @@ def add_materi_to_topik(id_topik: str, id_materi: str):
 
     conn.execute(ins)
     return {"status":"ok"}
+
+# ============================================================
+# DELETE TOPIK PEMBELAJARAN
+# Tidak boleh dihapus jika:
+# - Topik sudah pernah diakses mahasiswa
+# ============================================================
+@router.delete("/topik-pembelajaran")
+def delete_topik(id_topik: str = Query(...)):
+    
+    # 1. Cek apakah topik pernah diakses mahasiswa
+    q_access = select(StudentAccess).where(StudentAccess.c.id_topik == id_topik)
+    rows_access = conn.execute(q_access).first()
+
+    if rows_access:
+        raise HTTPException(
+            status_code=400,
+            detail="Tidak dapat menghapus topik: sudah diakses oleh mahasiswa."
+        )
+
+    # 2. Hapus relasi topik → materi (jika ada)
+    del_rel = TopikMateri.delete().where(TopikMateri.c.id_topik == id_topik)
+    conn.execute(del_rel)
+
+    # 3. Hapus topiknya
+    del_topik = TopikPembelajaran.delete().where(TopikPembelajaran.c.id_topik == id_topik)
+    result = conn.execute(del_topik)
+
+    if result.rowcount == 0:
+        raise HTTPException(
+            status_code=404,
+            detail="Topik tidak ditemukan."
+        )
+
+    return {"status": "ok", "message": "Topik berhasil dihapus"}

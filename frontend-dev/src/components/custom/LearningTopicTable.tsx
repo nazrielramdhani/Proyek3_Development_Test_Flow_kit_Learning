@@ -15,6 +15,7 @@ interface Props {
   order: 'asc' | 'desc';
   onSort: (property: string) => void;
   onTogglePublish: (id: string) => void;
+  onToggleTakedown?: (id: string) => void;
   onDelete: (id: string) => void;
   onEdit: (id: string) => void;
 }
@@ -30,7 +31,7 @@ const getStatusLabel = (status: 'P' | 'D') => status === 'P' ? 'Published' : 'Dr
 
 const formatStudentCount = (n: number) => (n === 0 ? '-' : n);
 
-const LearningTopicTable: React.FC<Props> = ({ topics, orderBy, order, onSort, onTogglePublish, onDelete, onEdit }) => {
+const LearningTopicTable: React.FC<Props> = ({ topics, orderBy, order, onSort, onTogglePublish, onToggleTakedown, onDelete, onEdit }) => {
   return (
     <table className="min-w-full">
       <thead className="bg-blue-800 text-white text-xs lg:text-sm">
@@ -80,10 +81,21 @@ const LearningTopicTable: React.FC<Props> = ({ topics, orderBy, order, onSort, o
                 title="Hapus"
               />
               {t.status === 'D' ? (
-                <FaCloudUploadAlt className="cursor-pointer text-green-500" onClick={() => onTogglePublish(t.id)} title="Publish" />
+                // Draft -> tampilkan tombol Publish
+                <FaCloudUploadAlt
+                  className="cursor-pointer text-green-500"
+                  onClick={() => onTogglePublish(t.id)}
+                  title="Publish"
+                />
               ) : (t.status === 'P' && (t.studentCount === 0)) ? (
-                <FaCloudDownloadAlt className="cursor-pointer text-gray-500" onClick={() => onTogglePublish(t.id)} title="Take down" />
+                // Published & belum diakses -> bisa takedown (panggil onToggleTakedown jika tersedia)
+                <FaCloudDownloadAlt
+                  className="cursor-pointer text-gray-700"
+                  onClick={() => onToggleTakedown ? onToggleTakedown(t.id) : onTogglePublish(t.id)}
+                  title="Take down"
+                />
               ) : (
+                // Tidak bisa takedown (sudah diakses) -> disabled icon
                 <FaCloudDownloadAlt className="cursor-not-allowed text-gray-300" title="Tidak bisa take down" />
               )}
             </td>
