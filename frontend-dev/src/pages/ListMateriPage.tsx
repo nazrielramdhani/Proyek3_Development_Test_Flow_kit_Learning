@@ -63,14 +63,12 @@ const ListMateriPage: React.FC = () => {
         id: m.id_materi,
         judul: m.judul_materi,
         deskripsi: m.deskripsi_materi,
-        jenis:
-          m.file_materi && m.file_materi.trim() !== ""
-            ? "Dokumen PDF"
-            : m.text_materi && m.text_materi.trim() !== ""
-            ? "Teks"
-            : m.video_materi && m.video_materi.trim() !== ""
-            ? "Video"
-            : "Kepo",
+        jenis: m.jenis_materi && m.jenis_materi.trim() !== ""
+              ? m.jenis_materi
+              : (m.file_materi && m.file_materi.trim() !== "" ? "Dokumen PDF"
+                  : (m.text_materi && m.text_materi.trim() !== "" ? "Teks"
+                    : (m.video_materi && m.video_materi.trim() !== "" ? "Video"
+                        : "Tidak Diketahui"))),
         jml_mahasiswa: m.jml_mahasiswa ?? 0,
       }));
 
@@ -166,12 +164,7 @@ const ListMateriPage: React.FC = () => {
                   value={searchInput}
                   onChange={handleSearchInput}
                 />
-                <button
-                  type="submit"
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-blue-800 hover:text-blue-600"
-                >
-                  <FaSearch />
-                </button>
+                <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
               </form>
 
               <button
@@ -182,15 +175,6 @@ const ListMateriPage: React.FC = () => {
                 Tambah Materi
               </button>
             </div>
-
-            {searchTerm && (
-              <button
-                onClick={resetSearch}
-                className="text-blue-600 text-xs underline mt-2"
-              >
-                Reset pencarian
-              </button>
-            )}
           </div>
         </div>
 

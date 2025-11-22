@@ -10,50 +10,76 @@ interface Materi {
 }
 
 interface Props {
-  materi: Materi[];
+  materi?: Materi[]; 
   onEdit: (m: Materi) => void;
   onDelete: (m: Materi) => void;
   onDetail?: (m: Materi) => void;
 }
 
-const LearningMateriTable: React.FC<Props> = ({ materi, onEdit, onDelete, onDetail }) => {
+const formatJenis = (jenisRaw: string | undefined) => {
+  if (!jenisRaw) return "Tidak Diketahui";
+  const j = jenisRaw.toLowerCase();
+  if (j.includes("pdf") || j.includes("dokumen")) return "Dokumen PDF";
+  if (j.includes("video")) return "Video";
+  if (j.includes("teks") || j.includes("text")) return "Teks";
+  return jenisRaw.charAt(0).toUpperCase() + jenisRaw.slice(1);
+};
+
+const LearningMateriTable: React.FC<Props> = ({ materi = [], onEdit, onDelete, onDetail }) => {
   return (
-    <table className="min-w-full border border-gray-300 text-sm">
-      <thead className="bg-gray-100 text-gray-700 font-semibold">
-        <tr>
-          <td className="py-3 px-4 border">Judul Materi</td>
-          <td className="py-3 px-4 border">Deskripsi</td>
-          <td className="py-3 px-4 border">Jenis Materi</td>
-          <td className="py-3 px-4 border text-center">Action</td>
+    <table className="min-w-full bg-white border rounded-lg shadow-md text-xs lg:text-sm">
+      <thead>
+        <tr className="bg-blue-800 text-white">
+          <th className="py-3 px-4 border">Judul Materi</th>
+          <th className="py-3 px-4 border">Deskripsi</th>
+          <th className="py-3 px-4 border">Jenis Materi</th>
+          <th className="py-3 px-4 border text-center">Action</th>
         </tr>
       </thead>
       <tbody>
-        {materi.map((item, index) => (
-          <tr key={index} className="hover:bg-gray-50">
-            <td className="py-3 px-4 border font-medium">{item.judul}</td>
-            <td className="py-3 px-4 border">{item.deskripsi || "-"}</td>
-            <td className="py-3 px-4 border capitalize">
-              {item.jenis === "file" ? "Dokumen PDF" :
-               item.jenis === "text" ? "Teks" :
-               item.jenis === "video" ? "Video" : "Tidak diketahui"}
-            </td>
-            <td className="py-3 px-4 border text-center space-x-3">
-              <button onClick={() => onEdit(item)} className="text-blue-600 hover:text-blue-800">
-                <FaEdit />
-              </button>
-              <button onClick={() => onDelete(item)} className="text-red-600 hover:text-red-800">
-                <FaTrash />
-              </button>
-              {onDetail && (
-                <button onClick={() => onDetail(item)} className="text-gray-700 hover:text-black">
-                  <FaInfoCircle />
-                </button>
-              )}
-            </td>
+        {materi.length === 0 ? (
+          <tr>
+            <td colSpan={4} className="py-6 text-center text-red-500">Data tidak ditemukan</td>
           </tr>
-        ))}
+        ) : (
+          materi.map((item, idx) => (
+            <tr key={item.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-blue-50'}`}>
+              <td className="py-3 px-4 border font-medium">{item.judul}</td>
+              <td className="py-3 px-4 border">{item.deskripsi || "-"}</td>
+              <td className="py-3 px-4 border">{formatJenis(item.jenis)}</td>
+              <td className="py-3 px-4 border text-center">
+                <div className="flex items-center justify-center space-x-2">
+                  <button
+                    onClick={() => onEdit(item)}
+                    className="p-2 rounded-full bg-white shadow-sm hover:bg-blue-50 text-blue-600"
+                    title="Edit"
+                  >
+                    <FaEdit />
+                  </button>
+                  <button
+                    onClick={() => onDelete(item)}
+                    className="p-2 rounded-full bg-white shadow-sm hover:bg-red-50 text-red-600"
+                    title="Hapus"
+                  >
+                    <FaTrash />
+                  </button>
+                  {onDetail && (
+                    <button
+                      onClick={() => onDetail(item)}
+                      className="p-2 rounded-full bg-white shadow-sm hover:bg-gray-50 text-gray-700"
+                      title="Detail"
+                    >
+                      <FaInfoCircle />
+                    </button>
+                  )}
+                </div>
+              </td>
+            </tr>
+          ))
+        )}
       </tbody>
     </table>
   );
 };
+
 export default LearningMateriTable;
