@@ -93,7 +93,7 @@ const TopicPage: React.FC = () => {
         {/* --- Header Bar --- */}
         <div className="w-full bg-white p-4 shadow">
           <div className="max-w-screen-xl mx-auto">
-            <h1 className="text-xl font-bold text-blue-800 mb-6 mt-4">
+            <h1 className="text-xl lg:text-2xl font-bold text-blue-800 mb-6 mt-4">
               Topik Pembelajaran
             </h1>
             <div className="relative w-full md:w-1/2">
