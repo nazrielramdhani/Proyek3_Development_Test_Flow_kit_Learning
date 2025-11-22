@@ -132,7 +132,7 @@ const TopicPage: React.FC = () => {
                       material.first_materi_id ? (
                         /* Case 1: Topic HAS materials -> Go to first material */
                         <Link to={`/topic/${material.id}/materi/${material.first_materi_id}`}>
-                          <button className="bg-blue-800 text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700">
+                          <button className="font-bold rounded lg:text-base md:text-sm text-xs lg:py-2 lg:px-4 py-1 px-2 bg-blue-600 text-white">
                             Lihat Materi
                           </button>
                         </Link>
@@ -140,14 +140,14 @@ const TopicPage: React.FC = () => {
                         /* Case 2: Topic is EMPTY -> Disabled Button */
                         <button 
                           disabled 
-                          className="bg-gray-300 text-gray-500 px-6 py-2 rounded-lg text-sm font-semibold cursor-not-allowed"
+                          className="font-bold rounded lg:text-base md:text-sm text-xs lg:py-2 lg:px-4 py-1 px-2 bg-gray-600 text-white"
                         >
                           Belum Ada
                         </button>
                       )
                     ) : (
                       /* Case 3: Not a topic (e.g. single file) */
-                      <button className="bg-blue-800 text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700">
+                      <button className="font-bold rounded lg:text-base md:text-sm text-xs lg:py-2 lg:px-4 py-1 px-2 bg-blue-600 text-white">
                         Preview
                       </button>
                     )}
