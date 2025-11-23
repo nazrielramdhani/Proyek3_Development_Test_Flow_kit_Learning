@@ -75,6 +75,12 @@ if not os.path.exists("static"):
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+# --- Files dir untuk PDF ---
+if not os.path.exists("files"):
+    os.makedirs("files")
+
+app.mount("/files", StaticFiles(directory="files"), name="files")
+
 
 @app.get("/")
 async def root():
