@@ -140,7 +140,7 @@ const TopicPage: React.FC = () => {
                         /* Case 2: Topic is EMPTY -> Disabled Button */
                         <button 
                           disabled 
-                          className="font-bold rounded lg:text-base md:text-sm text-xs lg:py-2 lg:px-4 py-1 px-2 bg-gray-600 text-white"
+                          className="font-bold rounded lg:text-base md:text-sm text-xs lg:py-2 lg:px-4 py-1 px-2 bg-gray-400 text-white"
                         >
                           Belum Ada
                         </button>
