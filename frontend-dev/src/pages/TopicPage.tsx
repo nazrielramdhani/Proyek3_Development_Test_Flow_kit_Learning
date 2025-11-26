@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import Sidebar from "../components/custom/SidebarStudent";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { FaSearch } from "react-icons/fa"; // Import search icon
 
 // Define a type for our material data
@@ -8,6 +8,8 @@ type Material = {
   id: string;
   nama: string;
   deskripsi: string;
+  type?: string;
+  first_materi_id?: string;
 };
 
 // This is the new page component
@@ -57,6 +59,41 @@ const TopicPage: React.FC = () => {
 
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
+  };
+
+  // Function to track student access to a topic
+  const handleTrackAccess = async (topicId: string, firstMateriId: string) => {
+    try {
+      console.log('[DEBUG] Tracking access for topic:', topicId);
+      console.log('[DEBUG] API URL:', `${apiUrl}/topik/${topicId}/track-access`);
+      console.log('[DEBUG] Token:', apiKey ? 'Token exists' : 'No token');
+      
+      // Call API to track access
+      const response = await fetch(`${apiUrl}/topik/${topicId}/track-access`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('[DEBUG] Response status:', response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('[DEBUG] Tracking result:', data);
+      } else {
+        const errorText = await response.text();
+        console.error('[DEBUG] Failed to track access:', response.status, errorText);
+      }
+      
+      // Navigate to materi page regardless of tracking result
+      navigate(`/topic/${topicId}/materi/${firstMateriId}`);
+    } catch (error) {
+      console.error('[DEBUG] Error tracking access:', error);
+      // Still navigate even if tracking fails
+      navigate(`/topic/${topicId}/materi/${firstMateriId}`);
+    }
   };
 
   // --- Sidebar responsiveness ---
@@ -132,12 +169,13 @@ const TopicPage: React.FC = () => {
                   <div className="w-2/12 flex justify-center">
                     {material.type === 'topic' ? (
                       material.first_materi_id ? (
-                        /* Case 1: Topic HAS materials -> Go to first material */
-                        <Link to={`/topic/${material.id}/materi/${material.first_materi_id}`}>
-                          <button className="font-bold rounded lg:text-base md:text-sm text-xs lg:py-2 lg:px-4 py-1 px-2 bg-blue-600 text-white">
-                            Lihat Materi
-                          </button>
-                        </Link>
+                        /* Case 1: Topic HAS materials -> Track access and go to first material */
+                        <button 
+                          onClick={() => handleTrackAccess(material.id, material.first_materi_id || '')}
+                          className="font-bold rounded lg:text-base md:text-sm text-xs lg:py-2 lg:px-4 py-1 px-2 bg-blue-600 text-white hover:bg-blue-700"
+                        >
+                          Lihat Materi
+                        </button>
                       ) : (
                         /* Case 2: Topic is EMPTY -> Disabled Button */
                         <button 

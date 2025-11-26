@@ -12,6 +12,7 @@ from models.system import System
 from models.tr_edge import TrEdge
 from models.tr_node import TrNode
 from models.param_modul import ParamModul
+from models.student_access import StudentAccess
 from schemas.topik import TopikSchema, EditTopikSchema, IdTopikSchema, MappingTopikModulSchema, DeleteTopikModulSchema
 from models.test_case import TestCase
 from models.penyelesaian_modul import PenyelesaianModul
@@ -310,8 +311,13 @@ async def addTopik(request: Request, data_topik: TopikSchema, response: Response
         updatedby=currentUser['userid'],
         createdby=currentUser['userid']
     )
-    conn.execute(query)
-    conn.execute(text("COMMIT;"))
+    trans = conn.begin()
+    try:
+        conn.execute(query)
+        trans.commit()
+    except Exception as e:
+        trans.rollback()
+        raise
     response = {"message": f"sukses menambahkan data topik baru", "id_topik":id_topik}
     return response
 
@@ -330,8 +336,13 @@ async def publishTopik(request: Request, data_topik: IdTopikSchema, response: Re
         updated=datetime.today(),
         updatedby=currentUser['userid'],
     ).where(Topik.c.ms_id_topik == id_topik)
-    conn.execute(query)
-    conn.execute(text("COMMIT;"))
+    trans = conn.begin()
+    try:
+        conn.execute(query)
+        trans.commit()
+    except Exception as e:
+        trans.rollback()
+        raise
     response = {"message": f"sukses publish data topik", "id_topik":id_topik}
     return response
 
@@ -346,8 +357,13 @@ async def editTopik(request: Request, data_topik: EditTopikSchema, response: Res
         updated=datetime.today(),
         updatedby=currentUser['userid'],
     ).where(Topik.c.ms_id_topik == id_topik)
-    conn.execute(query)
-    conn.execute(text("COMMIT;"))
+    trans = conn.begin()
+    try:
+        conn.execute(query)
+        trans.commit()
+    except Exception as e:
+        trans.rollback()
+        raise
     response = {"message": f"sukses mengubah data topik", "id_topik":id_topik}
     return response
 
@@ -367,12 +383,17 @@ async def deleteTopik(request: Request, data_topik: IdTopikSchema, response: Res
         return {"message": f"data id topik modul tidak dapat dihapus karena sedang digunakan"}
     
     #delete topik modul
-    query = TopikModul.delete().where(TopikModul.c.ms_id_topik == id_topik)
-    conn.execute(query)
+    trans = conn.begin()
+    try:
+        query = TopikModul.delete().where(TopikModul.c.ms_id_topik == id_topik)
+        conn.execute(query)
 
-    query = Topik.delete().where(Topik.c.ms_id_topik == id_topik)
-    conn.execute(query)
-    conn.execute(text("COMMIT;"))
+        query = Topik.delete().where(Topik.c.ms_id_topik == id_topik)
+        conn.execute(query)
+        trans.commit()
+    except Exception as e:
+        trans.rollback()
+        raise
     response = {"message": f"sukses menghapus data topik", "id_topik":id_topik}
     return response
 
@@ -386,24 +407,29 @@ async def mappingTopikModul(request: Request, data_topik_modul: MappingTopikModu
     
     listModul = data_topik_modul.list_modul
     counter = len(prevData)
-    for modul in listModul:
-        queryPrev = TopikModul.select().where(TopikModul.c.ms_id_topik == data_topik_modul.id_topik, TopikModul.c.ms_id_modul == modul.id_modul)
-        prevData = conn.execute(queryPrev).fetchone()
-        if prevData is None :
-            id_topik_modul = str(uuid.uuid4())
-            counter += 1
-            query = TopikModul.insert().values(
-                ms_id_topik_modul= id_topik_modul,
-                ms_id_topik=data_topik_modul.id_topik,
-                ms_id_modul=modul.id_modul,
-                ms_no = counter,
-                updated=datetime.today(),
-                created=datetime.today(),
-                updatedby=currentUser['userid'],
-                createdby=currentUser['userid']
-            )
-            conn.execute(query)
-    conn.execute(text("COMMIT;"))
+    trans = conn.begin()
+    try:
+        for modul in listModul:
+            queryPrev = TopikModul.select().where(TopikModul.c.ms_id_topik == data_topik_modul.id_topik, TopikModul.c.ms_id_modul == modul.id_modul)
+            prevData = conn.execute(queryPrev).fetchone()
+            if prevData is None :
+                id_topik_modul = str(uuid.uuid4())
+                counter += 1
+                query = TopikModul.insert().values(
+                    ms_id_topik_modul= id_topik_modul,
+                    ms_id_topik=data_topik_modul.id_topik,
+                    ms_id_modul=modul.id_modul,
+                    ms_no = counter,
+                    updated=datetime.today(),
+                    created=datetime.today(),
+                    updatedby=currentUser['userid'],
+                    createdby=currentUser['userid']
+                )
+                conn.execute(query)
+        trans.commit()
+    except Exception as e:
+        trans.rollback()
+        raise
     return {"message": f"sukses menambahkan data modul pada topik {data_topik_modul.id_topik}"}
 
 @topik.put("/topik/editMappingModul", dependencies=[Depends(JWTBearer())])
@@ -421,25 +447,30 @@ async def editMappingTopikModul(request: Request, data_topik_modul: MappingTopik
     dataUsed = conn.execute(text(queryCheckData), idTopik=data_topik_modul.id_topik).fetchone()
     print (dataUsed.usedTopikModul)
     if dataUsed.usedTopikModul == 0:
-        queryDelete = TopikModul.delete().where(TopikModul.c.ms_id_topik == data_topik_modul.id_topik)
-        conn.execute(queryDelete)
-        listModul = data_topik_modul.list_modul
-        counter = 0
-        for modul in listModul:
-            id_topik_modul = str(uuid.uuid4())
-            counter += 1
-            query = TopikModul.insert().values(
-                ms_id_topik_modul= id_topik_modul,
-                ms_id_topik=data_topik_modul.id_topik,
-                ms_id_modul=modul.id_modul,
-                ms_no = counter,
-                updated=datetime.today(),
-                created=datetime.today(),
-                updatedby=currentUser['userid'],
-                createdby=currentUser['userid']
-            )
-            conn.execute(query)
-        conn.execute(text("COMMIT;"))
+        trans = conn.begin()
+        try:
+            queryDelete = TopikModul.delete().where(TopikModul.c.ms_id_topik == data_topik_modul.id_topik)
+            conn.execute(queryDelete)
+            listModul = data_topik_modul.list_modul
+            counter = 0
+            for modul in listModul:
+                id_topik_modul = str(uuid.uuid4())
+                counter += 1
+                query = TopikModul.insert().values(
+                    ms_id_topik_modul= id_topik_modul,
+                    ms_id_topik=data_topik_modul.id_topik,
+                    ms_id_modul=modul.id_modul,
+                    ms_no = counter,
+                    updated=datetime.today(),
+                    created=datetime.today(),
+                    updatedby=currentUser['userid'],
+                    createdby=currentUser['userid']
+                )
+                conn.execute(query)
+            trans.commit()
+        except Exception as e:
+            trans.rollback()
+            raise
         return {"message": f"sukses mengubah data modul pada topik {data_topik_modul.id_topik}"}
     else:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -454,9 +485,14 @@ async def deleteMappingTopikModul(request: Request, param: DeleteTopikModulSchem
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
         return {"message": f"data id topik modul tidak dapat dihapus karena sedang digunakan"}
     else :
-        queryDelete = TopikModul.delete().where(TopikModul.c.ms_id_topik_modul == param.id_topik_modul)
-        conn.execute(queryDelete)
-        conn.execute(text("COMMIT;"))
+        trans = conn.begin()
+        try:
+            queryDelete = TopikModul.delete().where(TopikModul.c.ms_id_topik_modul == param.id_topik_modul)
+            conn.execute(queryDelete)
+            trans.commit()
+        except Exception as e:
+            trans.rollback()
+            raise
         return {"message": f"sukses hapus data modul pada topik {param.id_topik_modul}"}
 
 @topik.get("/topik/listModul", dependencies=[Depends(JWTBearer())])
@@ -473,3 +509,118 @@ async def mappingTopikModul(request: Request, id_topik: str, response: Response)
 
     
     return {"message": "sukses mengambil data ", "data": data_moduls}
+
+@topik.post("/topik/{id_topik}/track-access", dependencies=[Depends(JWTBearer())])
+async def track_student_access(request: Request, id_topik: str, response: Response):
+    """
+    Endpoint untuk mencatat akses mahasiswa ke topik pembelajaran.
+    Hanya dihitung 1x per mahasiswa per topik.
+    """
+    try:
+        currentUser = getDataFromJwt(request)
+        student_id = currentUser['userid']
+        
+        print(f"[DEBUG] Tracking access - Student ID: {student_id}, Topic ID: {id_topik}")
+        
+        # Cek apakah mahasiswa sudah pernah mengakses topik ini
+        check_query = text("""
+            SELECT * FROM student_access 
+            WHERE id_student = :student_id AND id_topik = :id_topik
+        """)
+        existing_access = conn.execute(check_query, student_id=student_id, id_topik=id_topik).fetchone()
+        
+        if existing_access:
+            print(f"[DEBUG] Access already recorded for student {student_id} on topic {id_topik}")
+            # Sudah pernah akses, tidak perlu tambah lagi
+            return {
+                "message": "Akses sudah tercatat sebelumnya",
+                "is_new_access": False
+            }
+        
+        print(f"[DEBUG] Recording new access for student {student_id} on topic {id_topik}")
+        
+        # Gunakan transaction untuk memastikan atomicity
+        trans = conn.begin()
+        try:
+            # Catat akses baru
+            insert_query = text("""
+                INSERT INTO student_access (id_student, id_topik, created_at)
+                VALUES (:student_id, :id_topik, NOW())
+            """)
+            conn.execute(insert_query, student_id=student_id, id_topik=id_topik)
+            
+            # Update jumlah mahasiswa di ms_topik
+            update_query = text("""
+                UPDATE ms_topik 
+                SET jml_mahasiswa = (
+                    SELECT COUNT(DISTINCT id_student) 
+                    FROM student_access 
+                    WHERE id_topik = :id_topik
+                )
+                WHERE id_topik = :id_topik
+            """)
+            conn.execute(update_query, id_topik=id_topik)
+            
+            # Commit transaction
+            trans.commit()
+            print(f"[DEBUG] Successfully recorded access and updated count")
+        except Exception as e:
+            # Rollback jika ada error
+            trans.rollback()
+            print(f"[DEBUG] Error during transaction: {e}")
+            raise
+        
+        # Ambil jumlah mahasiswa terbaru
+        count_query = text("""
+            SELECT jml_mahasiswa FROM ms_topik WHERE id_topik = :id_topik
+        """)
+        result = conn.execute(count_query, id_topik=id_topik).fetchone()
+        
+        return {
+            "message": "Akses berhasil dicatat",
+            "is_new_access": True,
+            "jml_mahasiswa": result.jml_mahasiswa if result else 0
+        }
+        
+    except Exception as e:
+        print(f"[ERROR] Failed to track access: {str(e)}")
+        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        return {"message": f"Error: {str(e)}"}
+
+@topik.get("/topik/{id_topik}/stats", dependencies=[Depends(JWTBearer())])
+async def get_topik_stats(id_topik: str, response: Response):
+    """
+    Endpoint untuk mendapatkan statistik topik (jumlah mahasiswa yang mengakses).
+    """
+    try:
+        # Hitung langsung dari student_access
+        stats_query = text("""
+            SELECT 
+                t.id_topik,
+                t.nama_topik,
+                t.deskripsi_topik,
+                COUNT(DISTINCT sa.id_student) as jml_mahasiswa_akses,
+                COUNT(sa.id_student) as total_akses
+            FROM ms_topik t
+            LEFT JOIN student_access sa ON t.id_topik = sa.id_topik
+            WHERE t.id_topik = :id_topik
+            GROUP BY t.id_topik, t.nama_topik, t.deskripsi_topik
+        """)
+        
+        result = conn.execute(stats_query, id_topik=id_topik).fetchone()
+        
+        if result is None:
+            response.status_code = status.HTTP_404_NOT_FOUND
+            return {"message": "Topik tidak ditemukan"}
+        
+        return {
+            "id_topik": result.id_topik,
+            "nama_topik": result.nama_topik,
+            "deskripsi_topik": result.deskripsi_topik,
+            "jml_mahasiswa": result.jml_mahasiswa_akses,
+            "total_akses": result.total_akses
+        }
+        
+    except Exception as e:
+        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        return {"message": f"Error: {str(e)}"}
