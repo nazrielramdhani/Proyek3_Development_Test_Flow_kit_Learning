@@ -73,9 +73,11 @@ const TopicPage: React.FC = () => {
   }, []);
   // --- End Sidebar responsiveness ---
 
-  // Filter materials based on search term
+// Filter materials based on search term
   const filteredMaterials = materials.filter((material) =>
-    material.nama.toLowerCase().includes(searchTerm.toLowerCase())
+    // Use (material.nama || "") to safely handle nulls
+    (material.nama || "").toLowerCase().includes(searchTerm.toLowerCase()) || 
+    (material.deskripsi || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (

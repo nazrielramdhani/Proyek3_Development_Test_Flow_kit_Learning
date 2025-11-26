@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import LayoutForm from "@/pages/LayoutForm";
 import logo_polban from "../assets/logo/polban.png";
@@ -30,9 +30,9 @@ const TextContent: React.FC<{ content: string }> = ({ content }) => (
   </div>
 );
 
-const PdfContent: React.FC<{ content: string }> = ({ content }) => {
+const PdfContent: React.FC<{ content: string }> = ({ content }) => { //buat pdf
   const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-  const pdfUrl = `${apiUrl}/files/${content}`;
+  const pdfUrl = `file:///E:/Documents/Proyek3_Development_Test_Flow_kit_Learning/backend-dev/files/Fundamentals of Database Systems.pdf`;
   
   console.log('PDF URL:', pdfUrl);
   
@@ -67,8 +67,6 @@ const MateriPage: React.FC = () => {
   const [topicData, setTopicData] = useState<TopicData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [listStartIndex, setListStartIndex] = useState(0);
-  const ITEMS_PER_PAGE = 10;
 
   // --- 1. Fetch Data ---
   useEffect(() => {
@@ -153,6 +151,21 @@ const MateriPage: React.FC = () => {
     }
   }, [topicId, navigate, apiUrl]);
 
+  // --- 3. Scroll Sidebar to Active Item ---
+  useEffect(() => {
+    if (activeMaterial && sidebarRef.current) {
+      // Find the button element for the active material
+      // (This assumes the button index matches the material index)
+      const index = materials.findIndex(m => m.id === activeMaterial.id);
+      if (index !== -1) {
+         const buttons = sidebarRef.current.querySelectorAll('button');
+         if (buttons[index]) {
+            buttons[index].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+         }
+      }
+    }
+  }, [activeMaterial, materials]);
+
   // --- 2. Set Active Material based on URL ---
   useEffect(() => {
     if (materials.length > 0 && materiId) {
@@ -181,6 +194,20 @@ const MateriPage: React.FC = () => {
 
   const handleNavigate = (targetId: string) => {
     navigate(`/topic/${topicId}/materi/${targetId}`);
+  };
+
+  const sidebarRef = useRef<HTMLDivElement>(null);
+
+  const handleScrollUp = () => {
+    if (sidebarRef.current) {
+      sidebarRef.current.scrollBy({ top: -200, behavior: "smooth" });
+    }
+  };
+
+  const handleScrollDown = () => {
+    if (sidebarRef.current) {
+      sidebarRef.current.scrollBy({ top: 200, behavior: "smooth" });
+    }
   };
 
   const handleOpenNewTab = () => {
@@ -224,7 +251,7 @@ const MateriPage: React.FC = () => {
       
     } else if (activeMaterial.type === 'pdf') {
       // 2. For PDF: Download the file from the server
-      let url = activeMaterial.content;
+      let url = activeMaterial.content; //download pdf
       if (url.startsWith('/')) {
           // Construct the full URL if it's a relative path
           url = `${apiUrl}${url}`; 
@@ -337,34 +364,30 @@ const MateriPage: React.FC = () => {
         <div className="flex flex-col md:flex-row w-screen min-h-screen gap-8 ml-10 mr-10 mt-10 mb-10">
             
           {/* --- LEFT SIDEBAR (Navigation List) --- */}
-          <div className="w-full lg:w-64 flex flex-col gap-2">
+          <div className="w-full lg:w-72 flex-shrink-0 flex flex-col gap-2">
             
-            {/* Top Arrow (Scroll Up) */}
-            {listStartIndex > 0 ? (
-              <div 
-                onClick={() => setListStartIndex(Math.max(0, listStartIndex - 1))}
-                className="bg-blue-700 text-white py-2 text-center rounded-t-md text-xs font-bold cursor-pointer hover:bg-blue-800 shadow-sm transition-colors"
-              >
-                ^
-              </div>
-            ) : (
-               // Placeholder to keep layout consistent if you want, or just render nothing
-               <div className="py-2"></div> 
-            )}
+            {/* Top Arrow (Scrolls Up) */}
+            <div 
+              onClick={handleScrollUp}
+              className="bg-blue-800 text-white py-2 text-center rounded-t-xl text-xs font-bold cursor-pointer hover:bg-blue-700 shadow-sm transition-colors select-none"
+            >
+              ^
+            </div>
 
-            <div className="flex flex-col gap-2">
-              {/* Slice the materials array to show only 10 items */}
-              {materials.slice(listStartIndex, listStartIndex + ITEMS_PER_PAGE).map((material, index) => {
-                // Calculate the actual index in the full list
-                const actualIndex = listStartIndex + index;
+            {/* List Container (Scrollable) */}
+            <div 
+              ref={sidebarRef} // <--- Attach Ref Here
+              className="flex flex-col gap-2 overflow-y-auto max-h-[500px] lg:max-h-[calc(100vh-300px)] pr-1 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent"
+            >
+              {/* Map ALL materials (No slice) */}
+              {materials.map((material, index) => {
                 const isActive = activeMaterial?.id === material.id;
-                
                 return (
                   <button
                     key={material.id}
                     onClick={() => handleNavigate(material.id)}
                     className={`
-                      w-full text-left px-4 py-3 rounded-md text-sm font-semibold transition-all duration-200 border
+                      w-full text-left px-4 py-3 rounded-x1 text-sm font-semibold transition-all duration-200 border flex-shrink-0
                       ${isActive 
                         ? "bg-blue-700 text-white border-blue-700 shadow-md transform translate-x-1" 
                         : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:text-blue-800 hover:border-blue-300"
@@ -372,7 +395,7 @@ const MateriPage: React.FC = () => {
                     `}
                   >
                     <div className="flex gap-2">
-                        <span className="opacity-70 font-normal min-w-[20px]">{actualIndex + 1}.</span>
+                        <span className="opacity-70 font-normal min-w-[20px]">{index + 1}.</span>
                         <span className="break-words">{material.title}</span>
                     </div>
                   </button>
@@ -380,40 +403,23 @@ const MateriPage: React.FC = () => {
               })}
             </div>
 
-            {/* Bottom Arrow (Scroll Down) */}
-            {listStartIndex + ITEMS_PER_PAGE < materials.length ? (
-              <div 
-                onClick={() => setListStartIndex(Math.min(materials.length - ITEMS_PER_PAGE, listStartIndex + 1))}
-                className="bg-blue-700 text-white py-2 text-center rounded-b-md text-xs font-bold cursor-pointer hover:bg-blue-800 shadow-sm transition-colors"
-              >
-                v
-              </div>
-            ) : (
-               <div className="py-2"></div>
-            )}
+            {/* Bottom Arrow (Scrolls Down) */}
+            <div 
+              onClick={handleScrollDown}
+              className="bg-blue-800 text-white py-2 text-center rounded-b-xl text-xs font-bold cursor-pointer hover:bg-blue-700 shadow-sm transition-colors select-none"
+            >
+              v
+            </div>
           </div>
 
           {/* --- RIGHT CONTENT AREA --- */}
           <div className="w-full lg:flex-1 flex flex-col gap-4">
             
-            {/* Toolbar (Dropdown & Actions) */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-lg shadow-sm">
-              <div className="relative w-full sm:w-64">
-                <select 
-                  className="appearance-none bg-white border border-gray-300 text-gray-700 py-2 px-4 pr-10 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full font-medium text-sm"
-                  value={activeMaterial?.id || ''}
-                  onChange={(e) => handleNavigate(e.target.value)}
-                >
-                  {materials.map((m) => (
-                    <option key={m.id} value={m.id}>{m.title}</option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                  <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                    <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/>
-                  </svg>
-                </div>
-              </div>
+            {/* Toolbar (Actions Only) */}
+            {/* 1. self-end: Pushes box to the right */}
+            {/* 2. w-fit: Shrinks box width to fit content (instead of full width) */}
+            {/* 3. p-2: Reduced padding to make it "smaller" */}
+            <div className="self-end w-fit flex flex-row items-center gap-3 bg-white p-2 rounded-lg shadow-sm">
               
               <div className="flex gap-3 w-full sm:w-auto">
                 <button 
