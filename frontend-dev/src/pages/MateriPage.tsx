@@ -32,7 +32,7 @@ const TextContent: React.FC<{ content: string }> = ({ content }) => (
 
 const PdfContent: React.FC<{ content: string }> = ({ content }) => { //buat pdf
   const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-  const pdfUrl = `file:///E:/Documents/Proyek3_Development_Test_Flow_kit_Learning/backend-dev/files/Fundamentals of Database Systems.pdf`;
+  const pdfUrl = `${apiUrl}/files/${content}`;
   
   console.log('PDF URL:', pdfUrl);
   
