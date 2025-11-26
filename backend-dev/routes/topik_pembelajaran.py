@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Body
 from config.database import conn
 from schemas.topik_pembelajaran import TopikCreate, TopikUpdate, TopikOut
 from models.topik_pembelajaran import TopikPembelajaran
@@ -99,32 +99,66 @@ def takedown_topik(id_topik: str = Query(...)):
     return {"status": "ok"}
 
 # ============================================================
-# LIST MATERI DALAM SATU TOPIK
+# LIST MATERI DALAM SATU TOPIK (urut menurut nomor_urutan bila ada)
 # ============================================================
 @router.get("/topik-pembelajaran/{id_topik}/materi")
 def list_materi_for_topik(id_topik: str):
-
     # Query raw SQL untuk mendapatkan semua materi terkait topik
+    # Urut berdasarkan nomor_urutan jika kolom ada, fallback ke created_at
     sql = text("""
-        SELECT m.* FROM ms_materi m
+        SELECT m.*, tm.nomor_urutan
+        FROM ms_materi m
         JOIN topik_materi tm ON tm.id_materi = m.id_materi
         WHERE tm.id_topik = :id
+        ORDER BY COALESCE(tm.nomor_urutan, 0) ASC, tm.created_at ASC
     """)
 
     rows = conn.execute(sql, {"id": id_topik}).mappings().all()
     return {"data": [dict(r) for r in rows]}
 
 # ============================================================
-# TAMBAHKAN MATERI KE DALAM TOPIK
+# TAMBAHKAN MATERI KE DALAM TOPIK (sederhana: insert satu mapping)
 # ============================================================
 @router.post("/topik-pembelajaran/{id_topik}/materi")
 def add_materi_to_topik(id_topik: str, id_materi: str):
-
     # Insert relasi topik → materi ke tabel topik_materi
+    # Jika ingin mengontrol nomor_urutan gunakan endpoint mapping di bawah
     ins = TopikMateri.insert().values(id_topik=id_topik, id_materi=id_materi)
-
     conn.execute(ins)
     return {"status":"ok"}
+
+# ============================================================
+# REPLACE / UPDATE MAPPING MATERI UNTUK SATU TOPIK
+# ============================================================
+@router.put("/topik-pembelajaran/{id_topik}/materi/mapping")
+def replace_materi_mapping(id_topik: str, payload: dict = Body(...)):
+    """
+    payload expected:
+    {
+      "list_materi": [
+         {"id_materi": "...", "nomor_urutan": 1},
+         ...
+      ]
+    }
+    """
+    list_materi = payload.get("list_materi", [])
+    # 1) Hapus mapping lama untuk topik
+    delq = TopikMateri.delete().where(TopikMateri.c.id_topik == id_topik)
+    conn.execute(delq)
+
+    # 2) Insert mapping baru (bulk) — set nomor_urutan jika ada, default 1
+    ins_values = []
+    for idx, m in enumerate(list_materi):
+        ins_values.append({
+            "id_topik": id_topik,
+            "id_materi": m.get("id_materi"),
+            "nomor_urutan": int(m.get("nomor_urutan") or (idx + 1))
+        })
+
+    if ins_values:
+        conn.execute(TopikMateri.insert(), ins_values)
+
+    return {"status":"ok", "count": len(ins_values)}
 
 # ============================================================
 # DELETE TOPIK PEMBELAJARAN
@@ -152,7 +186,12 @@ def delete_topik(id_topik: str = Query(...)):
     del_topik = TopikPembelajaran.delete().where(TopikPembelajaran.c.id_topik == id_topik)
     result = conn.execute(del_topik)
 
-    if result.rowcount == 0:
+    try:
+        rowcount = result.rowcount
+    except Exception:
+        rowcount = None
+
+    if rowcount == 0:
         raise HTTPException(
             status_code=404,
             detail="Topik tidak ditemukan."
