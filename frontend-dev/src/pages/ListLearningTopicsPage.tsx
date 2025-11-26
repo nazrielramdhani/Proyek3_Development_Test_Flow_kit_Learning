@@ -128,13 +128,25 @@ const ListLearningTopicsPage: React.FC = () => {
       }
 
       const data = await response.json(); 
-      const temp: LearningTopic[] = (data || []).map((t:any) => ({
+      let temp: LearningTopic[] = (data || []).map((t:any) => ({
         id: t.id_topik ?? t.ms_id_topik,
         name: t.nama_topik ?? t.ms_nama_topik,
         description: t.deskripsi_topik ?? t.ms_deskripsi_topik ?? '',
         studentCount: t.jml_mahasiswa ?? 0,
         status: (t.status_tayang === 1 || t.status === 'P') ? 'P' : 'D'
       }));
+
+      // ----- (AZZAM) KODE BARU DITAMBAHKAN (PERBAIKAN FILTER SEARCH) -----
+      // Logika: Jika ada keyword pencarian, filter array 'temp' 
+      // berdasarkan nama topik ATAU deskripsi topik.
+      if (keyword) {
+        const lowerKeyword = keyword.toLowerCase();
+        temp = temp.filter(topic => 
+          (topic.name && topic.name.toLowerCase().includes(lowerKeyword)) ||
+          (topic.description && topic.description.toLowerCase().includes(lowerKeyword))
+        );
+      }
+      // ----- AKHIR KODE BARU DITAMBAHKAN -----
 
       setTopics(temp);
       setTotalPages(1); 
