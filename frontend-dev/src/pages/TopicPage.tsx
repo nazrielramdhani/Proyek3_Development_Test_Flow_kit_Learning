@@ -111,11 +111,14 @@ const TopicPage: React.FC = () => {
   // --- End Sidebar responsiveness ---
 
 // Filter materials based on search term
-  const filteredMaterials = materials.filter((material) =>
-    // Use (material.nama || "") to safely handle nulls
-    (material.nama || "").toLowerCase().includes(searchTerm.toLowerCase()) || 
-    (material.deskripsi || "").toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // FIX: We use (material.nama || "") to turn NULL into "" so it doesn't crash
+  const filteredMaterials = materials.filter((material) => {
+    const nama = material.nama || "";
+    const deskripsi = material.deskripsi || "";
+    const term = searchTerm.toLowerCase();
+
+    return nama.toLowerCase().includes(term) || deskripsi.toLowerCase().includes(term);
+  });
 
   return (
     // Use light gray background for the content area
@@ -152,49 +155,57 @@ const TopicPage: React.FC = () => {
         <div className="flex-1 p-6 overflow-auto">
           <div className="max-w-full mx-auto">
 
-            <div className="flex text-sm font-semibold text-gray-500 px-4 mb-2">
-              <div className="w-4/12">Nama Topik</div>
-              <div className="w-6/12">Deskripsi</div>
-              <div className="w-2/12 text-center">Action</div>
-            </div>
-
-            <div className="space-y-4">
-              {filteredMaterials.map((material) => (
-                <div 
-                  key={material.id} 
-                  className="flex items-center bg-white p-4 rounded-lg shadow"
-                >
-                  <div className="w-4/12 font-bold text-gray-800">{material.nama}</div>
-                  <div className="w-6/12 text-sm text-gray-600">{material.deskripsi}</div>
-                  <div className="w-2/12 flex justify-center">
-                    {material.type === 'topic' ? (
-                      material.first_materi_id ? (
-                        /* Case 1: Topic HAS materials -> Track access and go to first material */
-                        <button 
-                          onClick={() => handleTrackAccess(material.id, material.first_materi_id || '')}
-                          className="font-bold rounded lg:text-base md:text-sm text-xs lg:py-2 lg:px-4 py-1 px-2 bg-blue-600 text-white hover:bg-blue-700"
-                        >
-                          Lihat Materi
-                        </button>
-                      ) : (
-                        /* Case 2: Topic is EMPTY -> Disabled Button */
-                        <button 
-                          disabled 
-                          className="font-bold rounded lg:text-base md:text-sm text-xs lg:py-2 lg:px-4 py-1 px-2 bg-gray-400 text-white"
-                        >
-                          Belum Ada
-                        </button>
-                      )
-                    ) : (
-                      /* Case 3: Not a topic (e.g. single file) */
-                      <button className="font-bold rounded lg:text-base md:text-sm text-xs lg:py-2 lg:px-4 py-1 px-2 bg-blue-600 text-white">
-                        Preview
-                      </button>
-                    )}
-                  </div>
+{/* --- MODIFICATION START: Simple If/Else --- */}
+            {filteredMaterials.length > 0 ? (
+              <>
+                {/* 1. Header Row (Only shows if data exists) */}
+                <div className="flex text-xl px-4 font-bold text-blue-800 mb-4">
+                  <div className="w-4/12">Nama Topik</div>
+                  <div className="w-6/12">Deskripsi</div>
+                  <div className="w-2/12 text-center">Action</div>
                 </div>
-              ))}
-            </div>
+
+                {/* 2. List Items */}
+                <div className="space-y-4">
+                  {filteredMaterials.map((material) => (
+                    <div 
+                      key={material.id} 
+                      className="flex items-center bg-white p-4 rounded-lg shadow"
+                    >
+                      <div className="w-4/12 font-bold text-gray-800">{material.nama}</div>
+                      <div className="w-6/12 text-sm text-gray-600">{material.deskripsi}</div>
+                      <div className="w-2/12 flex justify-center">
+                        {material.type === 'topic' ? (
+                          material.first_materi_id ? (
+                            <button 
+                              onClick={() => handleTrackAccess(material.id, material.first_materi_id || '')}
+                              className="font-bold rounded lg:text-base md:text-sm text-xs lg:py-2 lg:px-4 py-1 px-2 bg-blue-600 text-white hover:bg-blue-700"
+                            >
+                              Lihat Materi
+                            </button>
+                          ) : (
+                            <button 
+                              disabled 
+                              className="font-bold rounded lg:text-base md:text-sm text-xs lg:py-2 lg:px-4 py-1 px-2 bg-gray-400 text-white"
+                            >
+                              Belum Ada
+                            </button>
+                          )
+                        ) : (
+                          <button className="font-bold rounded lg:text-base md:text-sm text-xs lg:py-2 lg:px-4 py-1 px-2 bg-blue-600 text-white">
+                            Preview
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              /* --- ELSE: Display Nothing --- */
+              null
+            )}
+            {/* --- MODIFICATION END --- */}
           </div>
         </div>
       </div>

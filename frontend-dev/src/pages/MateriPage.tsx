@@ -6,6 +6,8 @@ import { ClipLoader } from "react-spinners";
 import ReactPlayer from 'react-player';
 import { PDFViewer } from "@/components/custom/PDFViewer";
 import { FaDownload, FaExternalLinkAlt } from "react-icons/fa";
+import ReactMarkdown from 'react-markdown';
+import showdown from 'showdown';
 
 // --- Types ---
 type MaterialData = {
@@ -23,14 +25,36 @@ type TopicData = {
 
 // --- Helper Components for Content ---
 const TextContent: React.FC<{ content: string }> = ({ content }) => (
-  <div className="bg-white p-8 shadow-sm rounded-lg text-gray-800 leading-relaxed min-h-[400px]">
-    <p className="whitespace-pre-wrap font-sans text-base text-justify">
+  <div className="bg-white p-8 shadow-sm rounded-lg text-gray-800 leading-relaxed min-h-[400px] overflow-auto">
+    <ReactMarkdown
+      components={{
+        // 1. Custom Image Styling: Centers it and makes it responsive
+        img: ({node, ...props}) => (
+          <div className="flex justify-center my-6">
+            <img 
+              {...props} 
+              className="max-w-full h-auto rounded-lg shadow-md border border-gray-200"
+              alt={props.alt || "Materi Image"}
+            />
+          </div>
+        ),
+        // 2. Paragraph Styling: Keeps your text spacing
+        p: ({node, ...props}) => (
+          <p {...props} className="mb-4 whitespace-pre-wrap text-justify" />
+        ),
+        // 3. Header Styling (Optional, enables # H1 and ## H2)
+        h1: ({node, ...props}) => <h1 {...props} className="text-2xl font-bold mb-4 mt-6 text-blue-800" />,
+        h2: ({node, ...props}) => <h2 {...props} className="text-xl font-bold mb-3 mt-5 text-gray-800" />,
+        ul: ({node, ...props}) => <ul {...props} className="list-disc pl-6 mb-4" />,
+        li: ({node, ...props}) => <li {...props} className="mb-1" />,
+      }}
+    >
       {content}
-    </p>
+    </ReactMarkdown>
   </div>
 );
 
-const PdfContent: React.FC<{ content: string }> = ({ content }) => { //buat pdf
+  const PdfContent: React.FC<{ content: string }> = ({ content }) => { //buat pdf
   const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
   const pdfUrl = `${apiUrl}/files/${content}`;
   
@@ -210,56 +234,118 @@ const MateriPage: React.FC = () => {
     }
   };
 
-  const handleOpenNewTab = () => {
+const handleOpenNewTab = () => {
     if (!activeMaterial) return;
 
     if (activeMaterial.type === 'text') {
-      // For Text: Create a temporary text file in browser memory to open
-      const blob = new Blob([activeMaterial.content], { type: 'text/plain' });
+      // --- FIX: Convert Markdown to HTML for New Tab ---
+      
+      // 1. Convert the content
+      const converter = new showdown.Converter();
+      const htmlBody = converter.makeHtml(activeMaterial.content);
+
+      // 2. Create a full HTML page structure with some basic styling
+      // We add CSS so the images look nice (centered, responsive)
+      const htmlPage = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>${activeMaterial.title}</title>
+          <style>
+            body { 
+              font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
+              padding: 40px; 
+              max-width: 800px; 
+              margin: 0 auto; 
+              line-height: 1.6; 
+              color: #374151;
+            }
+            h1 { color: #1e40af; margin-bottom: 20px; }
+            h2 { color: #1f2937; margin-top: 30px; }
+            p { margin-bottom: 15px; text-align: justify; }
+            
+            /* Image Styling to match your website */
+            img { 
+              max-width: 100%; 
+              height: auto; 
+              display: block; 
+              margin: 20px auto; 
+              border-radius: 8px; 
+              box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); 
+              border: 1px solid #e5e7eb;
+            }
+          </style>
+        </head>
+        <body>
+          <h1>${activeMaterial.title}</h1>
+          ${htmlBody}
+        </body>
+        </html>
+      `;
+
+      // 3. Create a Blob of type 'text/html' (Webpage) instead of 'text/plain'
+      const blob = new Blob([htmlPage], { type: 'text/html' });
       const url = URL.createObjectURL(blob);
       window.open(url, '_blank');
+
     } else if (activeMaterial.type === 'pdf') {
-      // For PDF: Check if it is a relative path from your server
+      // (PDF Logic remains the same)
       let url = activeMaterial.content;
       if (url.startsWith('/')) {
-          // Prepend the API URL if it's a local file (e.g., /uploads/file.pdf)
-          // Remove '/api' from the end of apiUrl if it exists to get base URL
-          // or just append if apiUrl is the domain. 
-          // Assuming apiUrl is 'http://localhost:3000':
-          url = `${apiUrl}${url}`; 
+         url = `${apiUrl}${url}`; 
       }
       window.open(url, '_blank');
+
     } else {
-      // For Video (YouTube): Just open the URL directly
+      // (Video Logic remains the same)
       window.open(activeMaterial.content, '_blank');
     }
   };
 
-  const handleDownload = async () => {
+    const handleDownload = async () => {
     if (!activeMaterial) return;
 
+    // --- 1. Handle TEXT (Markdown) -> Convert to Word (.doc) ---
     if (activeMaterial.type === 'text') {
-      // 1. For Text: Create a .txt file on the fly
+      
+      // Convert Markdown to HTML
+      const converter = new showdown.Converter();
+      const htmlContent = converter.makeHtml(activeMaterial.content);
+
+      // Wrap it in a simple HTML structure for Word
+      const documentContent = `
+        <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+        <head><meta charset='utf-8'><title>${activeMaterial.title}</title></head>
+        <body>
+          <h1>${activeMaterial.title}</h1>
+          ${htmlContent}
+        </body>
+        </html>
+      `;
+
+      // Create a Blob with Word MIME type
+      const blob = new Blob([documentContent], { type: 'application/msword' });
+      const url = URL.createObjectURL(blob);
+      
       const element = document.createElement("a");
-      const file = new Blob([activeMaterial.content], {type: 'text/plain'});
-      element.href = URL.createObjectURL(file);
-      // Use the title as the filename, replace spaces with underscores
-      element.download = `${activeMaterial.title.replace(/\s+/g, '_')}.txt`;
-      document.body.appendChild(element); // Required for this to work in FireFox
+      element.href = url;
+      // Save as .doc so Word opens it by default
+      element.download = `${activeMaterial.title.replace(/\s+/g, '_')}.doc`;
+      
+      document.body.appendChild(element);
       element.click();
-      document.body.removeChild(element); // Clean up
+      document.body.removeChild(element);
+      URL.revokeObjectURL(url);
       
     } else if (activeMaterial.type === 'pdf') {
-      // 2. For PDF: Download the file from the server
-      let url = activeMaterial.content; //download pdf
+      // --- 2. Handle PDF (Keep existing logic) ---
+      let url = activeMaterial.content;
       if (url.startsWith('/')) {
-          // Construct the full URL if it's a relative path
           url = `${apiUrl}${url}`; 
       }
       
       try {
-        // We fetch the file as a 'blob' to force the browser to download it
-        // instead of just opening it in a tab.
         const response = await fetch(url);
         const blob = await response.blob();
         const blobUrl = window.URL.createObjectURL(blob);
@@ -270,27 +356,19 @@ const MateriPage: React.FC = () => {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        window.URL.revokeObjectURL(blobUrl); // Clean up memory
+        window.URL.revokeObjectURL(blobUrl);
       } catch (error) {
         console.error("Download failed:", error);
-        // Fallback: just open it if the fancy download fails
         window.open(url, '_blank');
       }
 
-      } else {
-      // 3. For Video (YouTube) -> Redirect to y2mate
-      
-      // Copy the YouTube URL to the clipboard automatically
+    } else {
+      // --- 3. Handle VIDEO (Keep existing logic) ---
       navigator.clipboard.writeText(activeMaterial.content)
         .then(() => {
-          alert("Link YouTube berhasil disalin! Silakan Paste (Tempel) di kolom situs yang akan terbuka.");
+          alert("Link YouTube berhasil disalin!");
         })
-        .catch(() => {
-          // Fallback if clipboard fails
-          console.log("Clipboard write failed");
-        });
-
-      // Open the downloader site
+        .catch(() => console.log("Clipboard failed"));
       window.open("https://y2mate.nu/ysM1/", "_blank");
     }
   };
