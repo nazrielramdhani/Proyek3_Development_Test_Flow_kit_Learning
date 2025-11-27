@@ -234,18 +234,13 @@ const MateriPage: React.FC = () => {
     }
   };
 
-const handleOpenNewTab = () => {
+  const handleOpenNewTab = () => {
     if (!activeMaterial) return;
 
+    // --- 1. Handle TEXT (Markdown -> HTML) ---
     if (activeMaterial.type === 'text') {
-      // --- FIX: Convert Markdown to HTML for New Tab ---
-      
-      // 1. Convert the content
       const converter = new showdown.Converter();
       const htmlBody = converter.makeHtml(activeMaterial.content);
-
-      // 2. Create a full HTML page structure with some basic styling
-      // We add CSS so the images look nice (centered, responsive)
       const htmlPage = `
         <!DOCTYPE html>
         <html>
@@ -253,28 +248,8 @@ const handleOpenNewTab = () => {
           <meta charset="utf-8">
           <title>${activeMaterial.title}</title>
           <style>
-            body { 
-              font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
-              padding: 40px; 
-              max-width: 800px; 
-              margin: 0 auto; 
-              line-height: 1.6; 
-              color: #374151;
-            }
-            h1 { color: #1e40af; margin-bottom: 20px; }
-            h2 { color: #1f2937; margin-top: 30px; }
-            p { margin-bottom: 15px; text-align: justify; }
-            
-            /* Image Styling to match your website */
-            img { 
-              max-width: 100%; 
-              height: auto; 
-              display: block; 
-              margin: 20px auto; 
-              border-radius: 8px; 
-              box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); 
-              border: 1px solid #e5e7eb;
-            }
+            body { font-family: sans-serif; padding: 40px; max-width: 800px; margin: 0 auto; line-height: 1.6; color: #374151; }
+            img { max-width: 100%; height: auto; display: block; margin: 20px auto; border-radius: 8px; border: 1px solid #e5e7eb; }
           </style>
         </head>
         <body>
@@ -283,66 +258,62 @@ const handleOpenNewTab = () => {
         </body>
         </html>
       `;
-
-      // 3. Create a Blob of type 'text/html' (Webpage) instead of 'text/plain'
       const blob = new Blob([htmlPage], { type: 'text/html' });
       const url = URL.createObjectURL(blob);
       window.open(url, '_blank');
 
+    // --- 2. Handle PDF (Fix URL and Open) ---
     } else if (activeMaterial.type === 'pdf') {
-      // (PDF Logic remains the same)
       let url = activeMaterial.content;
-      if (url.startsWith('/')) {
-         url = `${apiUrl}${url}`; 
+      
+      // Logic: If it's just a filename (e.g. "doc.pdf"), add the backend path
+      if (!url.startsWith('http') && !url.startsWith('/')) {
+         url = `${apiUrl}/files/${url}`;
+      } else if (url.startsWith('/')) {
+         url = `${apiUrl}${url}`;
       }
+      
+      // Open the clean URL directly in a new tab
       window.open(url, '_blank');
 
+    // --- 3. Handle VIDEO ---
     } else {
-      // (Video Logic remains the same)
       window.open(activeMaterial.content, '_blank');
     }
   };
 
-    const handleDownload = async () => {
+  const handleDownload = async () => {
     if (!activeMaterial) return;
 
-    // --- 1. Handle TEXT (Markdown) -> Convert to Word (.doc) ---
+    // --- 1. Handle TEXT (Convert to Word .doc) ---
     if (activeMaterial.type === 'text') {
-      
-      // Convert Markdown to HTML
       const converter = new showdown.Converter();
       const htmlContent = converter.makeHtml(activeMaterial.content);
-
-      // Wrap it in a simple HTML structure for Word
       const documentContent = `
         <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
         <head><meta charset='utf-8'><title>${activeMaterial.title}</title></head>
-        <body>
-          <h1>${activeMaterial.title}</h1>
-          ${htmlContent}
-        </body>
+        <body><h1>${activeMaterial.title}</h1>${htmlContent}</body>
         </html>
       `;
-
-      // Create a Blob with Word MIME type
       const blob = new Blob([documentContent], { type: 'application/msword' });
       const url = URL.createObjectURL(blob);
-      
       const element = document.createElement("a");
       element.href = url;
-      // Save as .doc so Word opens it by default
       element.download = `${activeMaterial.title.replace(/\s+/g, '_')}.doc`;
-      
       document.body.appendChild(element);
       element.click();
       document.body.removeChild(element);
       URL.revokeObjectURL(url);
       
+    // --- 2. Handle PDF (Fetch and Download) ---
     } else if (activeMaterial.type === 'pdf') {
-      // --- 2. Handle PDF (Keep existing logic) ---
       let url = activeMaterial.content;
-      if (url.startsWith('/')) {
-          url = `${apiUrl}${url}`; 
+      
+      // FIX: Ensure the URL points to the /files/ folder on backend
+      if (!url.startsWith('http') && !url.startsWith('/')) {
+         url = `${apiUrl}/files/${url}`;
+      } else if (url.startsWith('/')) {
+         url = `${apiUrl}${url}`;
       }
       
       try {
@@ -352,22 +323,23 @@ const handleOpenNewTab = () => {
         
         const link = document.createElement('a');
         link.href = blobUrl;
+        // Rename the file to the Material Title for better UX
         link.download = `${activeMaterial.title.replace(/\s+/g, '_')}.pdf`;
+        
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         window.URL.revokeObjectURL(blobUrl);
       } catch (error) {
         console.error("Download failed:", error);
+        // Fallback: If fetch fails (CORS, etc), just open the link
         window.open(url, '_blank');
       }
 
+    // --- 3. Handle VIDEO (YouTube) ---
     } else {
-      // --- 3. Handle VIDEO (Keep existing logic) ---
       navigator.clipboard.writeText(activeMaterial.content)
-        .then(() => {
-          alert("Link YouTube berhasil disalin!");
-        })
+        .then(() => alert("Link YouTube berhasil disalin!"))
         .catch(() => console.log("Clipboard failed"));
       window.open("https://y2mate.nu/ysM1/", "_blank");
     }
