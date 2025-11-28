@@ -20,6 +20,7 @@ import AddTopicPage from "./pages/AddTopicPage";
 import ListLearningTopicsPage from "./pages/ListLearningTopicsPage";
 import ListMateriPage from "./pages/ListMateriPage";
 import TopicDetailPage from "./pages/TopikDetailPage";
+import MateriDetailPage from "./pages/MateriDetailPage";
 
 function App() {
   return (
@@ -46,6 +47,7 @@ function App() {
         <Route path="/learning-topics" element={<ListLearningTopicsPage />} />
         <Route path="/learning-materi" element={<ListMateriPage />} />
         <Route path="/Topic-Detail" element={<TopicDetailPage />} />
+        <Route path="/add-materi" element={<MateriDetailPage />} />
       </Routes>
     </BrowserRouter>
   );
