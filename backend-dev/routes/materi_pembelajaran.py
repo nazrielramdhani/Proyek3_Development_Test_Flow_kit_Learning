@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Query, Path
+from fastapi import APIRouter, HTTPException, Query, Path, UploadFile, File, Form
 from config.database import conn
 from schemas.materi_pembelajaran import MateriCreate, MateriUpdate, MateriOut
 from models.materi_pembelajaran import MateriPembelajaran
@@ -10,26 +10,43 @@ router = APIRouter(prefix="", tags=["materi_pembelajaran"])
 
 
 # ============================================================
-# CREATE — Menambahkan materi pembelajaran baru
+# CREATE — Upload file + simpan metadata
 # ============================================================
 @router.post("/materi")
-def create_materi(payload: MateriCreate):
-    # Generate ID unik untuk materi
+def create_materi(
+    judul_materi: str = Form(...),
+    deskripsi_materi: str = Form(None),
+    jenis_materi: str = Form(None),
+    text_materi: str = Form(None),
+    video_materi: str = Form(None),
+    file_materi: UploadFile = File(None)
+):
     id_ = str(uuid.uuid4())
 
-    # Query insert ke database
+    saved_filename = None
+    if file_materi:
+        # Validasi hanya file PDF
+        if not file_materi.filename.lower().endswith(".pdf"):
+            raise HTTPException(status_code=400, detail="File harus berformat PDF")
+
+        saved_filename = f"{id_}.pdf"
+        save_path = os.path.join(UPLOAD_DIR, saved_filename)
+
+        # Simpan file PDF ke server
+        with open(save_path, "wb") as f:
+            f.write(file_materi.file.read())
+
     ins = MateriPembelajaran.insert().values(
         id_materi=id_,
-        judul_materi=payload.judul_materi,
-        deskripsi_materi=payload.deskripsi_materi,
-        jenis_materi=payload.jenis_materi,   # menyimpan jenis materi jika ada
-        file_materi=payload.file_materi,
-        text_materi=payload.text_materi,
-        video_materi=payload.video_materi
+        judul_materi=judul_materi,
+        deskripsi_materi=deskripsi_materi,
+        jenis_materi=jenis_materi,
+        file_materi=saved_filename,
+        text_materi=text_materi,
+        video_materi=video_materi
     )
     conn.execute(ins)
 
-    # Response sukses
     return {"status": "ok", "id_materi": id_}
 
 
@@ -62,25 +79,54 @@ def get_materi(id_materi: str):
 
 
 # ============================================================
-# UPDATE — Memperbarui materi (hanya kolom yang dikirim saja)
+# UPDATE — Bisa ganti file PDF + update metadata
 # ============================================================
 @router.put("/materi")
-def update_materi(payload: MateriUpdate):
-    # Ambil hanya field yang berubah (bukan None)
-    upd_vals = {k: v for k, v in payload.dict().items() if v is not None and k != "id_materi"}
+def update_materi(
+    id_materi: str = Form(...),
+    judul_materi: str = Form(None),
+    deskripsi_materi: str = Form(None),
+    jenis_materi: str = Form(None),
+    text_materi: str = Form(None),
+    video_materi: str = Form(None),
+    file_materi: UploadFile = File(None)
+):
+    upd_vals = {}
 
-    # Jika tidak ada perubahan
+    # Tambahkan field hanya yang dikirim
+    if judul_materi is not None:
+        upd_vals["judul_materi"] = judul_materi
+    if deskripsi_materi is not None:
+        upd_vals["deskripsi_materi"] = deskripsi_materi
+    if jenis_materi is not None:
+        upd_vals["jenis_materi"] = jenis_materi
+    if text_materi is not None:
+        upd_vals["text_materi"] = text_materi
+    if video_materi is not None:
+        upd_vals["video_materi"] = video_materi
+
+    # Jika user ingin upload file baru
+    if file_materi:
+        if not file_materi.filename.lower().endswith(".pdf"):
+            raise HTTPException(status_code=400, detail="File harus berformat PDF")
+
+        new_filename = f"{id_materi}.pdf"
+        save_path = os.path.join(UPLOAD_DIR, new_filename)
+
+        with open(save_path, "wb") as f:
+            f.write(file_materi.file.read())
+
+        upd_vals["file_materi"] = new_filename
+
     if not upd_vals:
         return {"status": "nochange"}
 
-    # Jalankan update query
     upd = MateriPembelajaran.update().where(
-        MateriPembelajaran.c.id_materi == payload.id_materi
+        MateriPembelajaran.c.id_materi == id_materi
     ).values(**upd_vals)
 
     conn.execute(upd)
     return {"status": "ok"}
-
 
 # ============================================================
 # DELETE — Menghapus materi berdasarkan id_materi
