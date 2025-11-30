@@ -4,10 +4,15 @@ from schemas.materi_pembelajaran import MateriCreate, MateriUpdate, MateriOut
 from models.materi_pembelajaran import MateriPembelajaran
 from sqlalchemy import select, text
 import uuid
+import os
 
 # Router utama untuk seluruh endpoint materi pembelajaran
 router = APIRouter(prefix="", tags=["materi_pembelajaran"])
 
+# Folder penyimpanan file materi 
+UPLOAD_DIR = "materi_uploaded"
+if not os.path.exists(UPLOAD_DIR):
+    os.makedirs(UPLOAD_DIR)
 
 # ============================================================
 # CREATE — Upload file + simpan metadata
