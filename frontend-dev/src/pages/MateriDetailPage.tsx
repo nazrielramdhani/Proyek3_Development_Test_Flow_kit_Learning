@@ -1,6 +1,7 @@
 // frontend-dev/src/pages/MateriDetailPage.tsx
+
 import AddMateriForm from "@/components/custom/AddMateriForm";
-import LayoutForm from "./LayoutForm"; 
+import LayoutForm from "./LayoutForm"; // Pastikan path import ini sesuai
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ClipLoader } from "react-spinners";
@@ -8,9 +9,9 @@ import { ClipLoader } from "react-spinners";
 const MateriDetailPage = () => {
   const navigate = useNavigate();
   const apiUrl = import.meta.env.VITE_API_URL as string;
-  let apiKey: string = import.meta.env.VITE_API_KEY as string;
 
-  // Ambil token dari session 
+  // Ambil API key + token session (sama pola dengan halaman lain)
+  let apiKey: string = import.meta.env.VITE_API_KEY as string;
   const sessionData = localStorage.getItem("session");
   let session: any = null;
   if (sessionData) {
@@ -22,20 +23,83 @@ const MateriDetailPage = () => {
     }
   }
 
+  // Ambil query param id (kalau ada berarti mode EDIT)
+  const queryParams = new URLSearchParams(window.location.search);
+  const materiId = queryParams.get("id");
+
   const [isLoading, setIsLoading] = useState(false);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [screenName, setScreenName] = useState("Tambah Materi Pembelajaran");
+  const [screenName, setScreenName] = useState(
+    materiId ? "Edit Materi Pembelajaran" : "Tambah Materi Pembelajaran"
+  );
 
-  // Cek Session
+  // state untuk mengirim nilai awal ke AddMateriForm (saat edit)
+  const [initialData, setInitialData] = useState<any | null>(null);
+
+  // Cek Session (Sama seperti ModuleTestPage) + fetch detail bila edit
   useEffect(() => {
     if (!session) {
       navigate("/login");
-    } else if (session.login_type !== "teacher") {
-      navigate("/dashboard-student");
+      return;
     }
-    // Logic tambahan cek role teacher bisa ditaruh disini
-  }, [navigate]);
+    if (session.login_type !== "teacher") {
+      navigate("/dashboard-student");
+      return;
+    }
+
+    // Jika ada materiId → fetch detail untuk prefill form
+    if (materiId) {
+      const fetchDetail = async () => {
+        try {
+          const res = await fetch(`${apiUrl}/materi/${materiId}`, {
+            method: "GET",
+            headers: {
+              Accept: "application/json",
+              Authorization: `Bearer ${apiKey}`,
+            },
+          });
+
+          if (!res.ok) {
+            const txt = await res.text().catch(() => "");
+            throw new Error(txt || "Gagal mengambil detail materi");
+          }
+
+          const d = await res.json();
+
+          const jenisDb = (d.jenis_materi || "") as string;
+          const jl = jenisDb.toLowerCase();
+          let jenisMateriForm = "";
+          if (jl.includes("dokumen")) jenisMateriForm = "Dokumen";
+          else if (jl === "video") jenisMateriForm = "Video";
+          else if (jl === "teks" || jl === "text") jenisMateriForm = "Teks";
+
+          const fileName =
+            d.file_materi && typeof d.file_materi === "string"
+              ? d.file_materi.split("/").pop()
+              : "";
+
+          setInitialData({
+            judul: d.judul_materi ?? "",
+            deskripsi: d.deskripsi_materi ?? "",
+            jenisMateri: jenisMateriForm,
+            youtubeUrl: d.video_materi ?? "",
+            isiArtikel: d.text_materi ?? "",
+            fileName,
+          });
+
+          setScreenName("Edit Materi Pembelajaran");
+        } catch (err: any) {
+          console.error("fetch detail materi error", err);
+          setErrorMessage(err?.message || "Gagal mengambil data materi");
+          setTimeout(() => setErrorMessage(null), 2500);
+        }
+      };
+
+      fetchDetail();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [materiId]);
 
   const LoadingOverlay: React.FC = () => (
     <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
@@ -64,28 +128,33 @@ const MateriDetailPage = () => {
 
       // mapping jenis materi → field backend
       const jenisLower = (data.jenisMateri || "").toLowerCase();
-
-      // nilai yang akan disimpan di DB
       let jenisDb = data.jenisMateri || "";
       if (jenisLower === "dokumen" || jenisLower.includes("pdf")) {
         jenisDb = "Dokumen PDF";
       }
       formData.append("jenis_materi", jenisDb);
 
-      // kirim field spesifik sesuai jenis
+      // field khusus per jenis
       if ((jenisLower === "dokumen" || jenisLower.includes("pdf")) && file) {
-        // Jika jenis dokumen, kirim file PDF
         formData.append("file_materi", file);
       } else if (jenisLower === "video") {
-        // Jika jenis video, kirim link youtube
         formData.append("video_materi", data.youtubeUrl || "");
       } else if (jenisLower === "teks" || jenisLower === "text") {
-        // Jika jenis teks, kirim isi artikel
         formData.append("text_materi", data.isiArtikel || "");
       }
 
-      const res = await fetch(`${apiUrl}/materi`, {
-        method: "POST",
+      // Tentukan URL & method: tambah vs edit
+      const isEdit = !!materiId;
+      let url = `${apiUrl}/materi`;
+      let method: "POST" | "PUT" = "POST";
+
+      if (isEdit) {
+        method = "PUT";
+        formData.append("id_materi", materiId as string);
+      }
+
+      const res = await fetch(url, {
+        method,
         headers: {
           // Jangan set Content-Type manual kalau pakai FormData
           Authorization: `Bearer ${apiKey}`,
@@ -94,7 +163,7 @@ const MateriDetailPage = () => {
       });
 
       if (!res.ok) {
-        let msg = "Gagal Menyimpan Materi";
+        let msg = isEdit ? "Gagal Mengupdate Materi" : "Gagal Menyimpan Materi";
         try {
           const err = await res.json();
           if (err?.detail) msg = err.detail;
@@ -105,7 +174,9 @@ const MateriDetailPage = () => {
       }
 
       // Jika sukses:
-      setInfoMessage("Materi Berhasil Disimpan");
+      setInfoMessage(
+        isEdit ? "Materi Berhasil Diperbarui" : "Materi Berhasil Disimpan"
+      );
       setTimeout(() => {
         setInfoMessage(null);
         navigate("/learning-materi");
@@ -137,7 +208,11 @@ const MateriDetailPage = () => {
 
       {/* Container Form Utama (Style sama persis dengan ModuleTestPage) */}
       <div className="min-h-screen w-screen flex items-center justify-center bg-gray-100 p-10">
-        <AddMateriForm onAddMateri={handleAddMateri} onCancel={handleCancel} />
+        <AddMateriForm
+          onAddMateri={handleAddMateri}
+          onCancel={handleCancel}
+          initialData={initialData || undefined}
+        />
       </div>
 
       {isLoading && <LoadingOverlay />}

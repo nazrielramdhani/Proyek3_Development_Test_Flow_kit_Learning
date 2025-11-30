@@ -1,6 +1,5 @@
 // frontend-dev/src/components/custom/AddMateriForm.tsx
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,9 +24,17 @@ import { FaCloudUploadAlt, FaFileAlt, FaYoutube, FaAlignLeft, FaInfoCircle } fro
 interface AddMateriFormProps {
   onAddMateri: (data: any, file: File | null) => void;
   onCancel: () => void;
+  initialData?: {
+    judul?: string;
+    deskripsi?: string;
+    jenisMateri?: string;
+    youtubeUrl?: string;
+    isiArtikel?: string;
+    fileName?: string;
+  };
 }
 
-const AddMateriForm: React.FC<AddMateriFormProps> = ({ onAddMateri, onCancel }) => {
+const AddMateriForm: React.FC<AddMateriFormProps> = ({ onAddMateri, onCancel, initialData }) => {
   const [fileName, setFileName] = useState<string | null>(null);
   const [fileMateri, setFileMateri] = useState<File | null>(null);
 
@@ -43,6 +50,26 @@ const AddMateriForm: React.FC<AddMateriFormProps> = ({ onAddMateri, onCancel }) 
     },
     mode: "onBlur"
   });
+
+  // Prefill data saat mode EDIT materi
+  useEffect(() => {
+    if (!initialData) return;
+
+    form.reset({
+      judul: initialData.judul || "",
+      deskripsi: initialData.deskripsi || "",
+      jenisMateri: initialData.jenisMateri || "",
+      topik: "",
+      youtubeUrl: initialData.youtubeUrl || "",
+      isiArtikel: initialData.isiArtikel || "",
+      file: initialData.fileName || "",
+    });
+
+    // Set nama file supaya sisi kanan menampilkan info file existing
+    if (initialData.fileName) {
+      setFileName(initialData.fileName);
+    }
+  }, [initialData, form]);
 
   // Watcher untuk memantau perubahan dropdown secara realtime
   const jenisMateri = form.watch("jenisMateri");
