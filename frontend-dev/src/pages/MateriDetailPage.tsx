@@ -36,7 +36,7 @@ const MateriDetailPage = () => {
 
     const handleCancel = () => {
         // Redirect kembali ke halaman list materi
-        navigate('/materi'); 
+        navigate('/learning-materi'); 
     };
 
     const handleAddMateri = async (data: any, file: File | null) => {
