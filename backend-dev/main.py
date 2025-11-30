@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -24,6 +24,8 @@ import os
 
 from sqlalchemy.sql import text
 from config.database import conn
+import uuid
+from datetime import datetime
 
 # --- Locale: aman untuk Windows & Linux ---
 try:
@@ -81,6 +83,12 @@ if not os.path.exists("files"):
 
 app.mount("/files", StaticFiles(directory="files"), name="files")
 
+# --- Materi uploaded dir untuk PDF dari teacher ---
+if not os.path.exists("materi_uploaded"):
+    os.makedirs("materi_uploaded")
+
+app.mount("/materi_uploaded", StaticFiles(directory="materi_uploaded"), name="materi_uploaded")
+
 
 @app.get("/")
 async def root():
@@ -129,19 +137,23 @@ def get_topik_pembelajaran():
 
 @app.get("/api/topik/{id_topik}/materials")
 def get_materials_by_topic(id_topik: str):
+    """
+    Get all materials for a specific topic.
+    Returns materials with Indonesian field names matching the database structure.
+    """
     sql_query = text("""
         SELECT 
-            m.id_materi AS id,
-            m.judul_materi AS title,
-            m.deskripsi_materi AS description,  -- <--- ADD THIS LINE
-            CASE 
-                WHEN m.video_materi IS NOT NULL THEN 'video'
-                WHEN m.file_materi IS NOT NULL THEN 'pdf'
-                ELSE 'text'
-            END AS type,
-            COALESCE(m.text_materi, m.file_materi, m.video_materi) AS content
+            m.id_materi,
+            m.judul_materi,
+            m.deskripsi_materi,
+            m.jenis_materi,
+            m.file_materi,
+            m.text_materi,
+            m.video_materi,
+            m.created_at,
+            m.updated_at
         FROM ms_materi m
-        JOIN topik_materi tm ON m.id_materi = tm.id_materi
+        INNER JOIN topik_materi tm ON m.id_materi = tm.id_materi
         WHERE tm.id_topik = :id_topik
         ORDER BY tm.created_at ASC
     """)
@@ -150,6 +162,83 @@ def get_materials_by_topic(id_topik: str):
         return {"materials": results}
     except Exception as e:
         return {"error": str(e)}
+
+
+@app.post("/api/materi")
+def create_materi(
+    judul_materi: str = Form(...),
+    deskripsi_materi: str = Form(None),
+    jenis_materi: str = Form(...),
+    text_materi: str = Form(None),
+    video_materi: str = Form(None),
+    file_materi: UploadFile = File(None)
+):
+    """
+    Create new materi pembelajaran.
+    jenis_materi must be one of: 'text', 'pdf', 'video'
+    """
+    # Validasi jenis_materi
+    if jenis_materi not in ['text', 'pdf', 'video']:
+        raise HTTPException(status_code=400, detail="jenis_materi harus 'text', 'pdf', atau 'video'")
+    
+    # Validasi content sesuai jenis
+    if jenis_materi == 'pdf' and not file_materi:
+        raise HTTPException(status_code=400, detail="file_materi wajib untuk jenis PDF")
+    if jenis_materi == 'text' and not text_materi:
+        raise HTTPException(status_code=400, detail="text_materi wajib untuk jenis text")
+    if jenis_materi == 'video' and not video_materi:
+        raise HTTPException(status_code=400, detail="video_materi wajib untuk jenis video")
+    
+    id_materi = str(uuid.uuid4())
+    saved_filename = None
+    
+    # Handle PDF file upload
+    if file_materi:
+        # Validasi hanya file PDF
+        if not file_materi.filename.lower().endswith(".pdf"):
+            raise HTTPException(status_code=400, detail="File harus berformat PDF")
+        
+        saved_filename = f"{id_materi}.pdf"
+        save_path = os.path.join("materi_uploaded", saved_filename)
+        
+        # Simpan file PDF ke server
+        with open(save_path, "wb") as f:
+            f.write(file_materi.file.read())
+    
+    # Insert ke database
+    insert_query = text("""
+        INSERT INTO ms_materi (
+            id_materi, judul_materi, deskripsi_materi, jenis_materi,
+            file_materi, text_materi, video_materi, created_at, updated_at
+        ) VALUES (
+            :id_materi, :judul_materi, :deskripsi_materi, :jenis_materi,
+            :file_materi, :text_materi, :video_materi, :created_at, :updated_at
+        )
+    """)
+    
+    try:
+        conn.execute(insert_query, {
+            "id_materi": id_materi,
+            "judul_materi": judul_materi,
+            "deskripsi_materi": deskripsi_materi,
+            "jenis_materi": jenis_materi,
+            "file_materi": saved_filename,
+            "text_materi": text_materi,
+            "video_materi": video_materi,
+            "created_at": datetime.now(),
+            "updated_at": datetime.now()
+        })
+        
+        return {
+            "status": "ok",
+            "message": "Materi berhasil dibuat",
+            "id_materi": id_materi
+        }
+    except Exception as e:
+        # Jika gagal dan file sudah diupload, hapus file
+        if saved_filename and os.path.exists(os.path.join("materi_uploaded", saved_filename)):
+            os.remove(os.path.join("materi_uploaded", saved_filename))
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 # --- Jadwal (nonaktif, aktifkan kalau diperlukan) ---
 # @app.on_event('startup')
 # def init_data():

@@ -11,11 +11,13 @@ import showdown from 'showdown';
 
 // --- Types ---
 type MaterialData = {
-  id: string;
-  title: string;
-  description: string;
-  type: 'text' | 'pdf' | 'video';
-  content: string;
+  id_materi: string;
+  judul_materi: string;
+  deskripsi_materi: string;
+  jenis_materi: 'text' | 'pdf' | 'video';
+  file_materi: string | null;
+  text_materi: string | null;
+  video_materi: string | null;
 };
 
 type TopicData = {
@@ -56,7 +58,7 @@ const TextContent: React.FC<{ content: string }> = ({ content }) => (
 
   const PdfContent: React.FC<{ content: string }> = ({ content }) => { //buat pdf
   const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-  const pdfUrl = `${apiUrl}/files/${content}`;
+  const pdfUrl = `${apiUrl}/materi_uploaded/${content}`;
   
   console.log('PDF URL:', pdfUrl);
   
@@ -180,7 +182,7 @@ const MateriPage: React.FC = () => {
     if (activeMaterial && sidebarRef.current) {
       // Find the button element for the active material
       // (This assumes the button index matches the material index)
-      const index = materials.findIndex(m => m.id === activeMaterial.id);
+      const index = materials.findIndex(m => m.id_materi === activeMaterial.id_materi);
       if (index !== -1) {
          const buttons = sidebarRef.current.querySelectorAll('button');
          if (buttons[index]) {
@@ -194,9 +196,9 @@ const MateriPage: React.FC = () => {
   useEffect(() => {
     if (materials.length > 0 && materiId) {
       console.log('Looking for material:', materiId);
-      console.log('Available materials:', materials.map(m => m.id));
+      console.log('Available materials:', materials.map(m => m.id_materi));
       
-      const current = materials.find((m) => m.id === materiId);
+      const current = materials.find((m) => m.id_materi === materiId);
       
       if (current) {
         console.log('Found material:', current);
@@ -211,13 +213,21 @@ const MateriPage: React.FC = () => {
   }, [materiId, materials]);
 
   // --- 3. Navigation Logic ---
-  const currentIndex = materials.findIndex(m => m.id === activeMaterial?.id);
+  const currentIndex = materials.findIndex(m => m.id_materi === activeMaterial?.id_materi);
   
   const showPrevious = currentIndex > 0;
   const showNext = currentIndex < materials.length - 1;
 
   const handleNavigate = (targetId: string) => {
     navigate(`/topic/${topicId}/materi/${targetId}`);
+  };
+
+  // Helper function untuk mendapatkan content dari material
+  const getContentFromMaterial = (material: MaterialData): string => {
+    if (material.jenis_materi === 'pdf') return material.file_materi || '';
+    if (material.jenis_materi === 'text') return material.text_materi || '';
+    if (material.jenis_materi === 'video') return material.video_materi || '';
+    return '';
   };
 
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -238,22 +248,22 @@ const MateriPage: React.FC = () => {
     if (!activeMaterial) return;
 
     // --- 1. Handle TEXT (Markdown -> HTML) ---
-    if (activeMaterial.type === 'text') {
+    if (activeMaterial.jenis_materi === 'text') {
       const converter = new showdown.Converter();
-      const htmlBody = converter.makeHtml(activeMaterial.content);
+      const htmlBody = converter.makeHtml(activeMaterial.text_materi || '');
       const htmlPage = `
         <!DOCTYPE html>
         <html>
         <head>
           <meta charset="utf-8">
-          <title>${activeMaterial.title}</title>
+          <title>${activeMaterial.judul_materi}</title>
           <style>
             body { font-family: sans-serif; padding: 40px; max-width: 800px; margin: 0 auto; line-height: 1.6; color: #374151; }
             img { max-width: 100%; height: auto; display: block; margin: 20px auto; border-radius: 8px; border: 1px solid #e5e7eb; }
           </style>
         </head>
         <body>
-          <h1>${activeMaterial.title}</h1>
+          <h1>${activeMaterial.judul_materi}</h1>
           ${htmlBody}
         </body>
         </html>
@@ -263,12 +273,12 @@ const MateriPage: React.FC = () => {
       window.open(url, '_blank');
 
     // --- 2. Handle PDF (Fix URL and Open) ---
-    } else if (activeMaterial.type === 'pdf') {
-      let url = activeMaterial.content;
+    } else if (activeMaterial.jenis_materi === 'pdf') {
+      let url = activeMaterial.file_materi || '';
       
       // Logic: If it's just a filename (e.g. "doc.pdf"), add the backend path
       if (!url.startsWith('http') && !url.startsWith('/')) {
-         url = `${apiUrl}/files/${url}`;
+         url = `${apiUrl}/materi_uploaded/${url}`;
       } else if (url.startsWith('/')) {
          url = `${apiUrl}${url}`;
       }
@@ -278,7 +288,7 @@ const MateriPage: React.FC = () => {
 
     // --- 3. Handle VIDEO ---
     } else {
-      window.open(activeMaterial.content, '_blank');
+      window.open(activeMaterial.video_materi || '', '_blank');
     }
   };
 
@@ -286,32 +296,32 @@ const MateriPage: React.FC = () => {
     if (!activeMaterial) return;
 
     // --- 1. Handle TEXT (Convert to Word .doc) ---
-    if (activeMaterial.type === 'text') {
+    if (activeMaterial.jenis_materi === 'text') {
       const converter = new showdown.Converter();
-      const htmlContent = converter.makeHtml(activeMaterial.content);
+      const htmlContent = converter.makeHtml(activeMaterial.text_materi || '');
       const documentContent = `
         <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-        <head><meta charset='utf-8'><title>${activeMaterial.title}</title></head>
-        <body><h1>${activeMaterial.title}</h1>${htmlContent}</body>
+        <head><meta charset='utf-8'><title>${activeMaterial.judul_materi}</title></head>
+        <body><h1>${activeMaterial.judul_materi}</h1>${htmlContent}</body>
         </html>
       `;
       const blob = new Blob([documentContent], { type: 'application/msword' });
       const url = URL.createObjectURL(blob);
       const element = document.createElement("a");
       element.href = url;
-      element.download = `${activeMaterial.title.replace(/\s+/g, '_')}.doc`;
+      element.download = `${activeMaterial.judul_materi.replace(/\s+/g, '_')}.doc`;
       document.body.appendChild(element);
       element.click();
       document.body.removeChild(element);
       URL.revokeObjectURL(url);
       
     // --- 2. Handle PDF (Fetch and Download) ---
-    } else if (activeMaterial.type === 'pdf') {
-      let url = activeMaterial.content;
+    } else if (activeMaterial.jenis_materi === 'pdf') {
+      let url = activeMaterial.file_materi || '';
       
-      // FIX: Ensure the URL points to the /files/ folder on backend
+      // FIX: Ensure the URL points to the /materi_uploaded/ folder on backend
       if (!url.startsWith('http') && !url.startsWith('/')) {
-         url = `${apiUrl}/files/${url}`;
+         url = `${apiUrl}/materi_uploaded/${url}`;
       } else if (url.startsWith('/')) {
          url = `${apiUrl}${url}`;
       }
@@ -324,7 +334,7 @@ const MateriPage: React.FC = () => {
         const link = document.createElement('a');
         link.href = blobUrl;
         // Rename the file to the Material Title for better UX
-        link.download = `${activeMaterial.title.replace(/\s+/g, '_')}.pdf`;
+        link.download = `${activeMaterial.judul_materi.replace(/\s+/g, '_')}.pdf`;
         
         document.body.appendChild(link);
         link.click();
@@ -338,7 +348,7 @@ const MateriPage: React.FC = () => {
 
     // --- 3. Handle VIDEO (YouTube) ---
     } else {
-      navigator.clipboard.writeText(activeMaterial.content)
+      navigator.clipboard.writeText(activeMaterial.video_materi || '')
         .then(() => alert("Link YouTube berhasil disalin!"))
         .catch(() => console.log("Clipboard failed"));
       window.open("https://y2mate.nu/ysM1/", "_blank");
@@ -346,11 +356,11 @@ const MateriPage: React.FC = () => {
   };
 
   const handleNext = () => {
-    if (showNext) handleNavigate(materials[currentIndex + 1].id);
+    if (showNext) handleNavigate(materials[currentIndex + 1].id_materi);
   };
 
   const handlePrev = () => {
-    if (showPrevious) handleNavigate(materials[currentIndex - 1].id);
+    if (showPrevious) handleNavigate(materials[currentIndex - 1].id_materi);
   };
 
   // --- Loading Screen ---
@@ -403,10 +413,10 @@ const MateriPage: React.FC = () => {
         
         {/* Change this to use activeMaterial data */}
         <h3 className="text-lg font-bold text-gray-800 mt-1">
-          {activeMaterial?.title || ""}
+          {activeMaterial?.judul_materi || ""}
         </h3>
         <p className="text-gray-600 mt-2 text-sm">
-          {activeMaterial?.description || ""} 
+          {activeMaterial?.deskripsi_materi || ""} 
         </p>
       </div>
 
@@ -431,11 +441,11 @@ const MateriPage: React.FC = () => {
             >
               {/* Map ALL materials (No slice) */}
               {materials.map((material, index) => {
-                const isActive = activeMaterial?.id === material.id;
+                const isActive = activeMaterial?.id_materi === material.id_materi;
                 return (
                   <button
-                    key={material.id}
-                    onClick={() => handleNavigate(material.id)}
+                    key={material.id_materi}
+                    onClick={() => handleNavigate(material.id_materi)}
                     className={`
                       w-full text-left px-4 py-3 rounded-x1 text-sm font-semibold transition-all duration-200 border flex-shrink-0
                       ${isActive 
@@ -446,7 +456,7 @@ const MateriPage: React.FC = () => {
                   >
                     <div className="flex gap-2">
                         <span className="opacity-70 font-normal min-w-[20px]">{index + 1}.</span>
-                        <span className="break-words">{material.title}</span>
+                        <span className="break-words">{material.judul_materi}</span>
                     </div>
                   </button>
                 );
@@ -491,9 +501,9 @@ const MateriPage: React.FC = () => {
             <div className="min-h-[500px] bg-white rounded-lg shadow-sm p-6">
               {activeMaterial ? (
                 <>
-                  {activeMaterial.type === 'text' && <TextContent content={activeMaterial.content} />}
-                  {activeMaterial.type === 'pdf' && <PdfContent content={activeMaterial.content} />}
-                  {activeMaterial.type === 'video' && <VideoContent content={activeMaterial.content} />}
+                  {activeMaterial.jenis_materi === 'text' && <TextContent content={getContentFromMaterial(activeMaterial)} />}
+                  {activeMaterial.jenis_materi === 'pdf' && <PdfContent content={getContentFromMaterial(activeMaterial)} />}
+                  {activeMaterial.jenis_materi === 'video' && <VideoContent content={getContentFromMaterial(activeMaterial)} />}
                 </>
               ) : (
                 <div className="flex items-center justify-end h-full text-gray-400 p-8">
