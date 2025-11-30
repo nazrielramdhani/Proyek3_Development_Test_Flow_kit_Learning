@@ -201,11 +201,23 @@ def create_materi(
         saved_filename = f"{id_materi}.pdf"
         save_path = os.path.join("materi_uploaded", saved_filename)
         
-        # Simpan file PDF ke server
+        # Simpan file PDF ke server dengan size limit (10MB)
+        max_size = 10 * 1024 * 1024  # 10MB
+        file_size = 0
+        chunk_size = 1024 * 1024  # 1MB chunks
+        
         with open(save_path, "wb") as f:
-            f.write(file_materi.file.read())
+            while chunk := file_materi.file.read(chunk_size):
+                file_size += len(chunk)
+                if file_size > max_size:
+                    # Hapus file yang sudah tertulis sebagian
+                    f.close()
+                    if os.path.exists(save_path):
+                        os.remove(save_path)
+                    raise HTTPException(status_code=413, detail="File terlalu besar (maksimal 10MB)")
+                f.write(chunk)
     
-    # Insert ke database
+    # Insert ke database dengan transaction
     insert_query = text("""
         INSERT INTO ms_materi (
             id_materi, judul_materi, deskripsi_materi, jenis_materi,
@@ -216,6 +228,7 @@ def create_materi(
         )
     """)
     
+    trans = conn.begin()
     try:
         conn.execute(insert_query, {
             "id_materi": id_materi,
@@ -228,6 +241,7 @@ def create_materi(
             "created_at": datetime.now(),
             "updated_at": datetime.now()
         })
+        trans.commit()
         
         return {
             "status": "ok",
@@ -235,6 +249,7 @@ def create_materi(
             "id_materi": id_materi
         }
     except Exception as e:
+        trans.rollback()
         # Jika gagal dan file sudah diupload, hapus file
         if saved_filename and os.path.exists(os.path.join("materi_uploaded", saved_filename)):
             os.remove(os.path.join("materi_uploaded", saved_filename))

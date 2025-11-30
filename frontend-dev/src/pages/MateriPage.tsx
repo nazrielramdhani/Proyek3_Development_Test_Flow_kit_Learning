@@ -157,13 +157,15 @@ const MateriPage: React.FC = () => {
           throw new Error(data.error);
         }
         
-        if (data.materials && data.materials.length > 0) {
+        if (data.materials && Array.isArray(data.materials) && data.materials.length > 0) {
           setMaterials(data.materials);
         } else {
+          setMaterials([]);
           setError("Tidak ada materi yang tersedia untuk topik ini.");
         }
       } catch (error) {
         console.error("Failed to load materials:", error);
+        setMaterials([]);
         setError(`Gagal memuat materi: ${error instanceof Error ? error.message : 'Unknown error'}`);
       } finally {
         setIsLoading(false);
@@ -328,6 +330,11 @@ const MateriPage: React.FC = () => {
       
       try {
         const response = await fetch(url);
+        
+        if (!response.ok) {
+          throw new Error('File tidak ditemukan');
+        }
+        
         const blob = await response.blob();
         const blobUrl = window.URL.createObjectURL(blob);
         
@@ -338,12 +345,15 @@ const MateriPage: React.FC = () => {
         
         document.body.appendChild(link);
         link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(blobUrl);
+        
+        // Cleanup untuk mencegah memory leak
+        setTimeout(() => {
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(blobUrl);
+        }, 100);
       } catch (error) {
         console.error("Download failed:", error);
-        // Fallback: If fetch fails (CORS, etc), just open the link
-        window.open(url, '_blank');
+        alert("Gagal mengunduh file. Silakan coba lagi.");
       }
 
     // --- 3. Handle VIDEO (YouTube) ---
