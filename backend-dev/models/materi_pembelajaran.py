@@ -9,7 +9,6 @@ MateriPembelajaran = Table(
     Column("judul_materi", String(255), nullable=False),
     Column("deskripsi_materi", Text),
     Column("jenis_materi", String(50), nullable=False, server_default="default"),
-    Column("jml_mahasiswa", Integer, nullable=True, server_default="0"),
     Column("file_materi", Text),   # path / url
     Column("text_materi", Text),
     Column("video_materi", Text),  # youtube link

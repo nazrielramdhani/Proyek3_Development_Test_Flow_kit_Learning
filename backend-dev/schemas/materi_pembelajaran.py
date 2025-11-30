@@ -28,5 +28,4 @@ class MateriOut(BaseModel):
     file_materi: Optional[str]
     text_materi: Optional[str]
     video_materi: Optional[str]
-    jml_mahasiswa: Optional[int]
     jenis_materi: Optional[str] 
