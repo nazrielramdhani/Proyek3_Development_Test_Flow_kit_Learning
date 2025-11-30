@@ -40,7 +40,13 @@ except Exception:
         pass
 
 # Ubah ke /docs kalau mau default Swagger URL
-app = FastAPI(docs_url="/doc")
+app = FastAPI(
+    title="Test Flow Kit Learning API",
+    description="API untuk aplikasi pembelajaran berbasis test coverage",
+    version="1.1.0",
+    docs_url="/docs",
+    redoc_url="/redoc"
+)
 
 
 def cors_headers(app: FastAPI) -> FastAPI:
@@ -95,8 +101,18 @@ async def root():
     return {"message": "SAS API version 1.1"}
 
 
-@app.post("/api/topik/increment/{id_topik}")
+@app.post(
+    "/api/topik/increment/{id_topik}",
+    tags=["Topik Pembelajaran"],
+    summary="Increment topic view count",
+    response_description="Success status"
+)
 def increment_topic_view(id_topik: str):
+    """
+    Increment jumlah mahasiswa yang mengakses topik.
+    
+    - **id_topik**: ID topik yang diakses
+    """
     try:
         # Define the SQL query to increment the count
         sql_update = text("UPDATE ms_topik SET jml_mahasiswa = jml_mahasiswa + 1 WHERE id_topik = :id")
@@ -109,8 +125,19 @@ def increment_topic_view(id_topik: str):
         # Handle database errors
         return {"status": "error", "message": str(e)}
 
-@app.get("/api/topik-pembelajaran")
+@app.get(
+    "/api/topik-pembelajaran",
+    tags=["Topik Pembelajaran"],
+    summary="Get all published topics",
+    response_description="List of published learning topics"
+)
 def get_topik_pembelajaran():
+    """
+    Mengambil semua topik pembelajaran yang sudah dipublish.
+    
+    Returns:
+    - **topik**: Array of topic objects dengan first_materi_id
+    """
     # Updated query: ONLY fetch from ms_topik
     # We removed the 'UNION ALL' part that was pulling from ms_materi
     sql_query = text("""
@@ -135,11 +162,20 @@ def get_topik_pembelajaran():
         return {"error": str(e)}
 
 
-@app.get("/api/topik/{id_topik}/materials")
+@app.get(
+    "/api/topik/{id_topik}/materials",
+    tags=["Materi Pembelajaran"],
+    summary="Get all materials for a topic",
+    response_description="List of materials for the specified topic"
+)
 def get_materials_by_topic(id_topik: str):
     """
-    Get all materials for a specific topic.
-    Returns materials with Indonesian field names matching the database structure.
+    Mengambil semua materi pembelajaran untuk topik tertentu.
+    
+    - **id_topik**: ID topik yang ingin diambil materinya
+    
+    Returns:
+    - **materials**: Array of material objects with Indonesian field names
     """
     sql_query = text("""
         SELECT 
@@ -164,18 +200,41 @@ def get_materials_by_topic(id_topik: str):
         return {"error": str(e)}
 
 
-@app.post("/api/materi")
+@app.post(
+    "/api/materi",
+    tags=["Materi Pembelajaran"],
+    summary="Create new learning material",
+    status_code=201,
+    response_description="Successfully created material"
+)
 def create_materi(
-    judul_materi: str = Form(...),
-    deskripsi_materi: str = Form(None),
-    jenis_materi: str = Form(...),
-    text_materi: str = Form(None),
-    video_materi: str = Form(None),
-    file_materi: UploadFile = File(None)
+    judul_materi: str = Form(..., description="Judul materi pembelajaran"),
+    deskripsi_materi: str = Form(None, description="Deskripsi singkat materi"),
+    jenis_materi: str = Form(..., description="Jenis materi: text, pdf, atau video"),
+    text_materi: str = Form(None, description="Konten text dalam format markdown (untuk jenis text)"),
+    video_materi: str = Form(None, description="URL video YouTube (untuk jenis video)"),
+    file_materi: UploadFile = File(None, description="File PDF (untuk jenis pdf, max 10MB)")
 ):
     """
-    Create new materi pembelajaran.
-    jenis_materi must be one of: 'text', 'pdf', 'video'
+    Upload materi pembelajaran baru.
+    
+    **Jenis Materi:**
+    - `text`: Isi text_materi dengan konten markdown
+    - `pdf`: Upload file_materi (file PDF, max 10MB)
+    - `video`: Isi video_materi dengan YouTube URL
+    
+    **Validasi:**
+    - File PDF maksimal 10MB
+    - Jenis materi harus: text, pdf, atau video
+    - Content wajib diisi sesuai jenis materi
+    
+    **Example Request (PDF):**
+    ```
+    judul_materi: "Pengenalan Database"
+    deskripsi_materi: "Materi dasar tentang database"
+    jenis_materi: "pdf"
+    file_materi: [file.pdf]
+    ```
     """
     # Validasi jenis_materi
     if jenis_materi not in ['text', 'pdf', 'video']:
