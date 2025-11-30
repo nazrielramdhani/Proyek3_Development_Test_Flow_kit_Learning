@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -24,8 +24,6 @@ import os
 
 from sqlalchemy.sql import text
 from config.database import conn
-import uuid
-from datetime import datetime
 
 # --- Locale: aman untuk Windows & Linux ---
 try:
@@ -99,31 +97,6 @@ app.mount("/materi_uploaded", StaticFiles(directory="materi_uploaded"), name="ma
 @app.get("/")
 async def root():
     return {"message": "SAS API version 1.1"}
-
-
-@app.post(
-    "/api/topik/increment/{id_topik}",
-    tags=["Topik Pembelajaran"],
-    summary="Increment topic view count",
-    response_description="Success status"
-)
-def increment_topic_view(id_topik: str):
-    """
-    Increment jumlah mahasiswa yang mengakses topik.
-    
-    - **id_topik**: ID topik yang diakses
-    """
-    try:
-        # Define the SQL query to increment the count
-        sql_update = text("UPDATE ms_topik SET jml_mahasiswa = jml_mahasiswa + 1 WHERE id_topik = :id")
-        
-        # Execute the update, passing the id_topik from the URL
-        conn.execute(sql_update, {"id": id_topik})
-        
-        return {"status": "success", "message": f"Count for {id_topik} incremented."}
-    except Exception as e:
-        # Handle database errors
-        return {"status": "error", "message": str(e)}
 
 @app.get(
     "/api/topik-pembelajaran",
@@ -200,119 +173,6 @@ def get_materials_by_topic(id_topik: str):
         return {"error": str(e)}
 
 
-@app.post(
-    "/api/materi",
-    tags=["Materi Pembelajaran"],
-    summary="Create new learning material",
-    status_code=201,
-    response_description="Successfully created material"
-)
-def create_materi(
-    judul_materi: str = Form(..., description="Judul materi pembelajaran"),
-    deskripsi_materi: str = Form(None, description="Deskripsi singkat materi"),
-    jenis_materi: str = Form(..., description="Jenis materi: text, pdf, atau video"),
-    text_materi: str = Form(None, description="Konten text dalam format markdown (untuk jenis text)"),
-    video_materi: str = Form(None, description="URL video YouTube (untuk jenis video)"),
-    file_materi: UploadFile = File(None, description="File PDF (untuk jenis pdf, max 10MB)")
-):
-    """
-    Upload materi pembelajaran baru.
-    
-    **Jenis Materi:**
-    - `text`: Isi text_materi dengan konten markdown
-    - `pdf`: Upload file_materi (file PDF, max 10MB)
-    - `video`: Isi video_materi dengan YouTube URL
-    
-    **Validasi:**
-    - File PDF maksimal 10MB
-    - Jenis materi harus: text, pdf, atau video
-    - Content wajib diisi sesuai jenis materi
-    
-    **Example Request (PDF):**
-    ```
-    judul_materi: "Pengenalan Database"
-    deskripsi_materi: "Materi dasar tentang database"
-    jenis_materi: "pdf"
-    file_materi: [file.pdf]
-    ```
-    """
-    # Validasi jenis_materi
-    if jenis_materi not in ['text', 'pdf', 'video']:
-        raise HTTPException(status_code=400, detail="jenis_materi harus 'text', 'pdf', atau 'video'")
-    
-    # Validasi content sesuai jenis
-    if jenis_materi == 'pdf' and not file_materi:
-        raise HTTPException(status_code=400, detail="file_materi wajib untuk jenis PDF")
-    if jenis_materi == 'text' and not text_materi:
-        raise HTTPException(status_code=400, detail="text_materi wajib untuk jenis text")
-    if jenis_materi == 'video' and not video_materi:
-        raise HTTPException(status_code=400, detail="video_materi wajib untuk jenis video")
-    
-    id_materi = str(uuid.uuid4())
-    saved_filename = None
-    
-    # Handle PDF file upload
-    if file_materi:
-        # Validasi hanya file PDF
-        if not file_materi.filename.lower().endswith(".pdf"):
-            raise HTTPException(status_code=400, detail="File harus berformat PDF")
-        
-        saved_filename = f"{id_materi}.pdf"
-        save_path = os.path.join("materi_uploaded", saved_filename)
-        
-        # Simpan file PDF ke server dengan size limit (10MB)
-        max_size = 10 * 1024 * 1024  # 10MB
-        file_size = 0
-        chunk_size = 1024 * 1024  # 1MB chunks
-        
-        with open(save_path, "wb") as f:
-            while chunk := file_materi.file.read(chunk_size):
-                file_size += len(chunk)
-                if file_size > max_size:
-                    # Hapus file yang sudah tertulis sebagian
-                    f.close()
-                    if os.path.exists(save_path):
-                        os.remove(save_path)
-                    raise HTTPException(status_code=413, detail="File terlalu besar (maksimal 10MB)")
-                f.write(chunk)
-    
-    # Insert ke database dengan transaction
-    insert_query = text("""
-        INSERT INTO ms_materi (
-            id_materi, judul_materi, deskripsi_materi, jenis_materi,
-            file_materi, text_materi, video_materi, created_at, updated_at
-        ) VALUES (
-            :id_materi, :judul_materi, :deskripsi_materi, :jenis_materi,
-            :file_materi, :text_materi, :video_materi, :created_at, :updated_at
-        )
-    """)
-    
-    trans = conn.begin()
-    try:
-        conn.execute(insert_query, {
-            "id_materi": id_materi,
-            "judul_materi": judul_materi,
-            "deskripsi_materi": deskripsi_materi,
-            "jenis_materi": jenis_materi,
-            "file_materi": saved_filename,
-            "text_materi": text_materi,
-            "video_materi": video_materi,
-            "created_at": datetime.now(),
-            "updated_at": datetime.now()
-        })
-        trans.commit()
-        
-        return {
-            "status": "ok",
-            "message": "Materi berhasil dibuat",
-            "id_materi": id_materi
-        }
-    except Exception as e:
-        trans.rollback()
-        # Jika gagal dan file sudah diupload, hapus file
-        if saved_filename and os.path.exists(os.path.join("materi_uploaded", saved_filename)):
-            os.remove(os.path.join("materi_uploaded", saved_filename))
-        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 # --- Jadwal (nonaktif, aktifkan kalau diperlukan) ---
 # @app.on_event('startup')
 # def init_data():
