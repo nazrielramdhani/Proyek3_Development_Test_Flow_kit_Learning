@@ -347,12 +347,12 @@ const MateriPage: React.FC = () => {
 
       {/* --- TOPIC INFO SECTION (Attached to top bar) --- */}
       <div className="bg-white px-6 py-6 shadow-sm">
-        <h2 className="text-xl font-bold text-gray-900">
+        <h2 className="text-2xl font-bold text-gray-900">
           {topicData?.nama_topik || "Loading..."} 
         </h2>
         
         {/* Change this to use activeMaterial data */}
-        <h3 className="text-lg font-bold text-gray-800 mt-1">
+        <h3 className="text-lg font-bold text-gray-900 mt-1">
           {activeMaterial?.title || ""}
         </h3>
         <p className="text-gray-600 mt-2 text-sm">
@@ -426,7 +426,7 @@ const MateriPage: React.FC = () => {
                   onClick={handleDownload} // <--- ADD THIS
                   className="flex-1 sm:flex-none bg-blue-700 text-white px-5 py-2 rounded-md font-semibold hover:bg-blue-800 transition-colors flex items-center gap-2 text-sm shadow-sm"
                 >
-                  <FaDownload /> <span className="hidden sm:inline">Unduh</span>
+                  <FaDownload /> <span className="hidden sm:inline rounded-md">Unduh</span>
                 </button>
               <button 
                   onClick={handleOpenNewTab} // <--- ADD THIS

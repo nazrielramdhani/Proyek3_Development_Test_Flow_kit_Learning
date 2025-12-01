@@ -115,7 +115,7 @@ const TopicPage: React.FC = () => {
         <div className="flex-1 p-6 overflow-auto">
           <div className="max-w-full mx-auto">
 
-            <div className="flex text-sm font-semibold text-gray-500 px-4 mb-2">
+            <div className="flex text-sm lg:text-xl font-bold text-blue-800 mb-4 px-4 ">
               <div className="w-4/12">Nama Topik</div>
               <div className="w-6/12">Deskripsi</div>
               <div className="w-2/12 text-center">Action</div>
