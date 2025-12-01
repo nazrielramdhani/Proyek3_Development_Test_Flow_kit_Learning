@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "@types/showdown": "^2.0.6",
+    "react-markdown": "^10.1.0",
+    "showdown": "^2.1.0",
+    "sweetalert2": "^11.26.3"
+  }
+}
