@@ -26,35 +26,51 @@ type TopicData = {
 };
 
 // --- Helper Components for Content ---
-const TextContent: React.FC<{ content: string }> = ({ content }) => (
-  <div className="bg-white p-8 shadow-sm rounded-lg text-gray-800 leading-relaxed min-h-[400px] overflow-auto">
-    <ReactMarkdown
-      components={{
-        // 1. Custom Image Styling: Centers it and makes it responsive
-        img: ({node, ...props}) => (
-          <div className="flex justify-center my-6">
-            <img 
-              {...props} 
-              className="max-w-full h-auto rounded-lg shadow-md border border-gray-200"
-              alt={props.alt || "Materi Image"}
-            />
-          </div>
-        ),
-        // 2. Paragraph Styling: Keeps your text spacing
-        p: ({node, ...props}) => (
-          <p {...props} className="mb-4 whitespace-pre-wrap text-justify" />
-        ),
-        // 3. Header Styling (Optional, enables # H1 and ## H2)
-        h1: ({node, ...props}) => <h1 {...props} className="text-2xl font-bold mb-4 mt-6 text-blue-800" />,
-        h2: ({node, ...props}) => <h2 {...props} className="text-xl font-bold mb-3 mt-5 text-gray-800" />,
-        ul: ({node, ...props}) => <ul {...props} className="list-disc pl-6 mb-4" />,
-        li: ({node, ...props}) => <li {...props} className="mb-1" />,
-      }}
-    >
-      {content}
-    </ReactMarkdown>
-  </div>
-);
+// --- Helper Components for Content ---
+const TextContent: React.FC<{ content: string }> = ({ content }) => {
+  // 1. Ambil API URL (Sama seperti di komponen lain)
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+  return (
+    <div className="bg-white p-8 shadow-sm rounded-lg text-gray-800 leading-relaxed min-h-[400px] overflow-auto">
+      <ReactMarkdown
+        components={{
+          // 2. Custom Image Styling: Deteksi link gambar dan perbaiki URL-nya
+          img: ({node, ...props}) => {
+            let imgSrc = props.src;
+            
+            // Jika src ada dan BUKAN link eksternal (tidak mulai dengan http)
+            // Maka anggap ini file dari folder 'materi_uploaded' backend
+            if (imgSrc && !imgSrc.startsWith('http')) {
+              imgSrc = `${apiUrl}/materi_uploaded/${imgSrc}`;
+            }
+
+            return (
+              <div className="flex justify-center my-6">
+                <img 
+                  {...props} 
+                  src={imgSrc} // Gunakan URL yang sudah diperbaiki
+                  className="max-w-full h-auto rounded-lg shadow-md border border-gray-200"
+                  alt={props.alt || "Materi Image"}
+                />
+              </div>
+            );
+          },
+          // Komponen lainnya tetap sama
+          p: ({node, ...props}) => (
+            <p {...props} className="mb-4 whitespace-pre-wrap text-justify" />
+          ),
+          h1: ({node, ...props}) => <h1 {...props} className="text-2xl font-bold mb-4 mt-6 text-blue-800" />,
+          h2: ({node, ...props}) => <h2 {...props} className="text-xl font-bold mb-3 mt-5 text-gray-800" />,
+          ul: ({node, ...props}) => <ul {...props} className="list-disc pl-6 mb-4" />,
+          li: ({node, ...props}) => <li {...props} className="mb-1" />,
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
+};
 
   const PdfContent: React.FC<{ content: string }> = ({ content }) => { //buat pdf
   const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
