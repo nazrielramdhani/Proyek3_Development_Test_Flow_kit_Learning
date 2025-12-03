@@ -14,19 +14,25 @@ import {
   // BreadcrumbPage,
 } from "@/components/ui/breadcrumb";
 import logo_polban from "../../assets/logo/polban.png";
-import { useNavigate  } from "react-router-dom";
-
+import { useNavigate } from "react-router-dom";
 
 type NavbarProps = {
   screenName?: string;
+  backUrl?: string; // Menambahkan prop optional backUrl
 };
+
 const NavbarForm: React.FC<NavbarProps> = ({
-  screenName = "Screen Name"
+  screenName = "Screen Name",
+  backUrl, // Destructure backUrl
 }) => {
   const navigate = useNavigate();
 
   const handleBack = () => {
-    navigate(-1)
+    if (backUrl) {
+      navigate(backUrl); // Jika ada backUrl, navigasi ke URL tersebut
+    } else {
+      navigate(-1); // Jika tidak, kembali ke history sebelumnya
+    }
   };
 
   return (
@@ -72,7 +78,10 @@ const NavbarForm: React.FC<NavbarProps> = ({
 
       <a
         href="#"
-        onClick={handleBack}
+        onClick={(e) => {
+          e.preventDefault(); // Mencegah reload halaman default anchor tag
+          handleBack();
+        }}
         className="flex items-center text-white hover:text-gray-300 mr-8"
       >
         <FaSignOutAlt size={18} className="mr-0 md:mr-2" />
@@ -80,6 +89,6 @@ const NavbarForm: React.FC<NavbarProps> = ({
       </a>
     </nav>
   );
-}
+};
 
 export default NavbarForm;
