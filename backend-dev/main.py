@@ -82,10 +82,10 @@ if not os.path.exists("static"):
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # --- Files dir untuk PDF ---
-if not os.path.exists("files"):
-    os.makedirs("files")
+if not os.path.exists("materi_uploaded"):
+    os.makedirs("materi_uploaded")
 
-app.mount("/files", StaticFiles(directory="files"), name="files")
+app.mount("/materi_uploaded", StaticFiles(directory="materi_uploaded"), name="materi_uploaded")
 
 # --- Materi uploaded dir untuk PDF dari teacher ---
 if not os.path.exists("materi_uploaded"):

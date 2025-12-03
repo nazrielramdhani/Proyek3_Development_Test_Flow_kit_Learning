@@ -26,32 +26,50 @@ type TopicData = {
 };
 
 // --- Helper Components for Content ---
-const TextContent: React.FC<{ content: string }> = ({ content }) => (
-  <div className="bg-white p-8 shadow-sm rounded-lg text-gray-800 leading-relaxed min-h-[400px] overflow-auto">
-    <ReactMarkdown
-      components={{
-        img: ({node, ...props}) => (
-          <div className="flex justify-center my-6">
-            <img 
-              {...props} 
-              className="max-w-full h-auto rounded-lg shadow-md border border-gray-200"
-              alt={props.alt || "Materi Image"}
-            />
-          </div>
-        ),
-        p: ({node, ...props}) => (
-          <p {...props} className="mb-4 whitespace-pre-wrap text-justify" />
-        ),
-        h1: ({node, ...props}) => <h1 {...props} className="text-2xl font-bold mb-4 mt-6 text-blue-800" />,
-        h2: ({node, ...props}) => <h2 {...props} className="text-xl font-bold mb-3 mt-5 text-gray-800" />,
-        ul: ({node, ...props}) => <ul {...props} className="list-disc pl-6 mb-4" />,
-        li: ({node, ...props}) => <li {...props} className="mb-1" />,
-      }}
-    >
-      {content}
-    </ReactMarkdown>
-  </div>
-);
+const TextContent: React.FC<{ content: string }> = ({ content }) => {
+  // 1. Ambil API URL (Sama seperti di komponen lain)
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+  return (
+    <div className="bg-white p-8 shadow-sm rounded-lg text-gray-800 leading-relaxed min-h-[400px] overflow-auto">
+      <ReactMarkdown
+        components={{
+          // 2. Custom Image Styling: Deteksi link gambar dan perbaiki URL-nya
+          img: ({node, ...props}) => {
+            let imgSrc = props.src;
+            
+            // Jika src ada dan BUKAN link eksternal (tidak mulai dengan http)
+            // Maka anggap ini file dari folder 'materi_uploaded' backend
+            if (imgSrc && !imgSrc.startsWith('http')) {
+              imgSrc = `${apiUrl}/materi_uploaded/${imgSrc}`;
+            }
+
+            return (
+              <div className="flex justify-center my-6">
+                <img 
+                  {...props} 
+                  src={imgSrc} // Gunakan URL yang sudah diperbaiki
+                  className="max-w-full h-auto rounded-lg shadow-md border border-gray-200"
+                  alt={props.alt || "Materi Image"}
+                />
+              </div>
+            );
+          },
+          // Komponen lainnya tetap sama
+          p: ({node, ...props}) => (
+            <p {...props} className="mb-4 whitespace-pre-wrap text-justify" />
+          ),
+          h1: ({node, ...props}) => <h1 {...props} className="text-2xl font-bold mb-4 mt-6 text-blue-800" />,
+          h2: ({node, ...props}) => <h2 {...props} className="text-xl font-bold mb-3 mt-5 text-gray-800" />,
+          ul: ({node, ...props}) => <ul {...props} className="list-disc pl-6 mb-4" />,
+          li: ({node, ...props}) => <li {...props} className="mb-1" />,
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
+};
 
 const PdfContent: React.FC<{ content: string }> = ({ content }) => {
   const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
@@ -231,9 +249,31 @@ const MateriPage: React.FC = () => {
   const handleOpenNewTab = () => {
     if (!activeMaterial) return;
 
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
     if (activeMaterial.jenis_materi === 'text') {
+      // --- FIX: Pre-process Markdown to add Backend URL to images ---
+      // This finds ![Alt](filename.png) and turns it into ![Alt](http://.../filename.png)
+      const rawContent = activeMaterial.text_materi || "";
+      const contentWithFixedImages = rawContent.replace(
+        /!\[([^\]]*)\]\(([^)]+)\)/g,
+        (match, alt, src) => {
+          // If it's already a full URL (http...), leave it alone
+          if (src.startsWith('http')) return match;
+          
+          // Otherwise, force it to look at your backend folder
+          // Removes any leading slash from src to avoid double slashes
+          const cleanSrc = src.replace(/^\//, '');
+          const fullUrl = `${apiUrl}/materi_uploaded/${cleanSrc}`;
+          return `![${alt}](${fullUrl})`;
+        }
+      );
+
+      // 1. Convert the content
       const converter = new showdown.Converter();
-      const htmlBody = converter.makeHtml(activeMaterial.text_materi || '');
+      const htmlBody = converter.makeHtml(contentWithFixedImages);
+
+      // 2. Create a full HTML page structure with some basic styling
       const htmlPage = `
         <!DOCTYPE html>
         <html>
@@ -241,8 +281,27 @@ const MateriPage: React.FC = () => {
           <meta charset="utf-8">
           <title>${activeMaterial.judul_materi}</title>
           <style>
-            body { font-family: sans-serif; padding: 40px; max-width: 800px; margin: 0 auto; line-height: 1.6; color: #374151; }
-            img { max-width: 100%; height: auto; display: block; margin: 20px auto; border-radius: 8px; border: 1px solid #e5e7eb; }
+            body { 
+              font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
+              padding: 40px; 
+              max-width: 800px; 
+              margin: 0 auto; 
+              line-height: 1.6; 
+              color: #374151;
+            }
+            h1 { color: #1e40af; margin-bottom: 20px; }
+            h2 { color: #1f2937; margin-top: 30px; }
+            p { margin-bottom: 15px; text-align: justify; }
+            
+            img { 
+              max-width: 100%; 
+              height: auto; 
+              display: block; 
+              margin: 20px auto; 
+              border-radius: 8px; 
+              box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); 
+              border: 1px solid #e5e7eb;
+            }
           </style>
         </head>
         <body>
@@ -251,12 +310,13 @@ const MateriPage: React.FC = () => {
         </body>
         </html>
       `;
+
       const blob = new Blob([htmlPage], { type: 'text/html' });
       const url = URL.createObjectURL(blob);
       window.open(url, '_blank');
 
     } else if (activeMaterial.jenis_materi === 'pdf') {
-      let url = activeMaterial.file_materi || '';
+      let url = activeMaterial.file_materi || "";
       if (!url.startsWith('http') && !url.startsWith('/')) {
          url = `${apiUrl}/materi_uploaded/${url}`;
       } else if (url.startsWith('/')) {
@@ -265,34 +325,60 @@ const MateriPage: React.FC = () => {
       window.open(url, '_blank');
 
     } else {
-      window.open(activeMaterial.video_materi || '', '_blank');
+      // Video
+      const videoUrl = activeMaterial.video_materi || "";
+      window.open(videoUrl, '_blank');
     }
   };
 
   const handleDownload = async () => {
     if (!activeMaterial) return;
 
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+    // --- 1. Handle TEXT (Convert to Word .doc) ---
     if (activeMaterial.jenis_materi === 'text') {
+      
+      // --- FIX: Pre-process Markdown images for Word ---
+      const rawContent = activeMaterial.text_materi || "";
+      const contentWithFixedImages = rawContent.replace(
+        /!\[([^\]]*)\]\(([^)]+)\)/g,
+        (match, alt, src) => {
+          if (src.startsWith('http')) return match;
+          const cleanSrc = src.replace(/^\//, '');
+          const fullUrl = `${apiUrl}/materi_uploaded/${cleanSrc}`;
+          return `![${alt}](${fullUrl})`;
+        }
+      );
+
       const converter = new showdown.Converter();
-      const htmlContent = converter.makeHtml(activeMaterial.text_materi || '');
+      const htmlContent = converter.makeHtml(contentWithFixedImages);
+
       const documentContent = `
         <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
         <head><meta charset='utf-8'><title>${activeMaterial.judul_materi}</title></head>
-        <body><h1>${activeMaterial.judul_materi}</h1>${htmlContent}</body>
+        <body>
+          <h1>${activeMaterial.judul_materi}</h1>
+          ${htmlContent}
+        </body>
         </html>
       `;
+
       const blob = new Blob([documentContent], { type: 'application/msword' });
       const url = URL.createObjectURL(blob);
+      
       const element = document.createElement("a");
       element.href = url;
       element.download = `${activeMaterial.judul_materi.replace(/\s+/g, '_')}.doc`;
+      
       document.body.appendChild(element);
       element.click();
       document.body.removeChild(element);
       URL.revokeObjectURL(url);
       
     } else if (activeMaterial.jenis_materi === 'pdf') {
-      let url = activeMaterial.file_materi || '';
+      // --- 2. Handle PDF Download ---
+      let url = activeMaterial.file_materi || "";
       if (!url.startsWith('http') && !url.startsWith('/')) {
          url = `${apiUrl}/materi_uploaded/${url}`;
       } else if (url.startsWith('/')) {
@@ -301,8 +387,6 @@ const MateriPage: React.FC = () => {
       
       try {
         const response = await fetch(url);
-        if (!response.ok) throw new Error('File tidak ditemukan');
-        
         const blob = await response.blob();
         const blobUrl = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -310,17 +394,17 @@ const MateriPage: React.FC = () => {
         link.download = `${activeMaterial.judul_materi.replace(/\s+/g, '_')}.pdf`;
         document.body.appendChild(link);
         link.click();
-        setTimeout(() => {
-          document.body.removeChild(link);
-          window.URL.revokeObjectURL(blobUrl);
-        }, 100);
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(blobUrl);
       } catch (error) {
         console.error("Download failed:", error);
-        alert("Gagal mengunduh file. Silakan coba lagi.");
+        window.open(url, '_blank');
       }
 
     } else {
-      navigator.clipboard.writeText(activeMaterial.video_materi || '')
+      // --- 3. Handle Video Download (Link Copy) ---
+      const videoUrl = activeMaterial.video_materi || "";
+      navigator.clipboard.writeText(videoUrl)
         .then(() => alert("Link YouTube berhasil disalin!"))
         .catch(() => console.log("Clipboard failed"));
       window.open("https://y2mate.nu/ysM1/", "_blank");
