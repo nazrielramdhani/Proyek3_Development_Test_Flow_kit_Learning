@@ -1,6 +1,5 @@
-// frontend-dev/src/components/custom/AddMateriForm.tsx
-import React, { useState, useEffect } from 'react';
-import { useForm } from "react-hook-form";
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useForm, Controller } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -19,10 +18,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FaCloudUploadAlt, FaFileAlt, FaYoutube, FaAlignLeft, FaInfoCircle } from "react-icons/fa";
+import { 
+    FaCloudUploadAlt, 
+    FaFileAlt, 
+    FaYoutube, 
+    FaInfoCircle,
+} from "react-icons/fa";
+
+// --- LIBRARY REACT QUILL ---
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 
 interface AddMateriFormProps {
-  onAddMateri: (data: any, file: File | null) => void;
+  onAddMateri: (data: any, file: File | null, articleImages: File[]) => void;
   onCancel: () => void;
   initialData?: {
     judul?: string;
@@ -37,21 +45,27 @@ interface AddMateriFormProps {
 const AddMateriForm: React.FC<AddMateriFormProps> = ({ onAddMateri, onCancel, initialData }) => {
   const [fileName, setFileName] = useState<string | null>(null);
   const [fileMateri, setFileMateri] = useState<File | null>(null);
+  
+  // State untuk menyimpan file gambar artikel yang akan dikirim ke backend
+  const [articleImages, setArticleImages] = useState<File[]>([]);
+
+  // Ref untuk React Quill Editor
+  const quillRef = useRef<ReactQuill>(null);
 
   const form = useForm({
     defaultValues: {
       judul: "",
       deskripsi: "",
-      jenisMateri: "", // UBAH KE KOSONG (supaya user harus pilih)
-      topik: "",
+      jenisMateri: "", 
       youtubeUrl: "",
       isiArtikel: "",
       file: "", 
+      topik: "", 
     },
     mode: "onBlur"
   });
 
-  // Prefill data saat mode EDIT materi
+  // Prefill Data (Mode Edit)
   useEffect(() => {
     if (!initialData) return;
 
@@ -59,21 +73,20 @@ const AddMateriForm: React.FC<AddMateriFormProps> = ({ onAddMateri, onCancel, in
       judul: initialData.judul || "",
       deskripsi: initialData.deskripsi || "",
       jenisMateri: initialData.jenisMateri || "",
-      topik: "",
       youtubeUrl: initialData.youtubeUrl || "",
       isiArtikel: initialData.isiArtikel || "",
       file: initialData.fileName || "",
+      topik: "", 
     });
 
-    // Set nama file supaya sisi kanan menampilkan info file existing
     if (initialData.fileName) {
       setFileName(initialData.fileName);
     }
   }, [initialData, form]);
 
-  // Watcher untuk memantau perubahan dropdown secara realtime
   const jenisMateri = form.watch("jenisMateri");
 
+  // Handler Upload PDF (Sisi Kanan)
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, field: any) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -83,10 +96,67 @@ const AddMateriForm: React.FC<AddMateriFormProps> = ({ onAddMateri, onCancel, in
     }
   };
 
+  // --- [PERBAIKAN UTAMA] IMAGE HANDLER DENGAN BASE64 ---
+  const imageHandler = () => {
+    const input = document.createElement('input');
+    input.setAttribute('type', 'file');
+    input.setAttribute('accept', 'image/*');
+    input.click();
+
+    input.onchange = () => {
+      const file = input.files ? input.files[0] : null;
+      if (file) {
+        // 1. Simpan file ke state array (untuk dikirim ke backend via FormData)
+        setArticleImages((prev) => [...prev, file]);
+
+        // 2. Baca file sebagai Base64 agar PASTI TAMPIL di editor
+        const reader = new FileReader();
+        reader.onload = () => {
+            const imageUrl = reader.result as string; // Hasil Base64
+            
+            const editor = quillRef.current?.getEditor();
+            if (editor) {
+                // Masukkan gambar ke posisi kursor
+                const range = editor.getSelection();
+                const index = range ? range.index : editor.getLength();
+                
+                // Insert gambar
+                editor.insertEmbed(index, "image", imageUrl);
+                
+                // Geser kursor ke sebelah kanan gambar
+                editor.setSelection(index + 1, 0);
+            }
+        };
+        reader.readAsDataURL(file); // Mulai proses baca file
+      }
+    };
+  };
+
+  // --- KONFIGURASI TOOLBAR ---
+  const modules = useMemo(() => ({
+    toolbar: {
+      container: [
+        [{ 'header': [1, 2, false] }], 
+        ['bold', 'italic', 'underline', 'strike'],
+        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+        ['link', 'image'], // Tombol Image
+        ['clean']
+      ],
+      handlers: {
+        image: imageHandler 
+      }
+    },
+  }), []);
+
+  const formats = [
+    'header', 'bold', 'italic', 'underline', 'strike', 
+    'list', 'bullet', 'link', 'image'
+  ];
+
   const onSubmit = (data: any) => {
     const cleanData = { ...data };
     
-    // Hapus field yang tidak relevan sesuai jenis materi
+    // Bersihkan field yang tidak relevan
     if (jenisMateri === 'Dokumen') {
         delete cleanData.youtubeUrl;
         delete cleanData.isiArtikel;
@@ -98,28 +168,69 @@ const AddMateriForm: React.FC<AddMateriFormProps> = ({ onAddMateri, onCancel, in
         delete cleanData.youtubeUrl;
     }
 
-    onAddMateri(cleanData, fileMateri);
+    onAddMateri(cleanData, fileMateri, articleImages);
   };
 
   return (
     <Form {...form}>
+      {/* --- CSS KHUSUS EDITOR --- */}
+      <style>{`
+        /* Container utama editor */
+        .quill {
+            display: flex;
+            flex-direction: column;
+            background-color: white;
+            border-radius: 0.5rem;
+        }
+        
+        /* Toolbar */
+        .ql-toolbar {
+            border-top-left-radius: 0.5rem;
+            border-top-right-radius: 0.5rem;
+            background-color: #f9fafb;
+            border-color: #e2e8f0 !important;
+        }
+
+        /* Area Ketik */
+        .ql-container {
+            border-bottom-left-radius: 0.5rem;
+            border-bottom-right-radius: 0.5rem;
+            font-size: 1rem;
+            border-color: #e2e8f0 !important;
+            min-height: 350px; 
+        }
+        
+        /* Agar gambar terlihat */
+        .ql-editor img {
+            max-width: 100%;
+            height: auto;
+            display: inline-block; /* Paksa tampil */
+            margin: 10px auto;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+        
+        /* Spacer bawah agar tombol simpan tidak ketutup */
+        .editor-wrapper {
+            margin-bottom: 20px; 
+        }
+      `}</style>
+
       <form 
         onSubmit={form.handleSubmit(onSubmit)} 
         className="space-y-4 p-4 sm:p-6 md:p-10 w-full mx-auto bg-white shadow-md rounded-md"
       >
         
-        {/* LAYOUT GRID: Kiri (Input), Kanan (Dynamic Content) */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             
             {/* --- KOLOM KIRI (Metadata) --- */}
-            <div className="lg:col-span-2 space-y-4">
+            <div className="space-y-4">
                 <Card className="shadow-none border-0 p-0">
                     <CardHeader className="px-0 pt-0 pb-4">
                         <CardTitle className="text-lg text-gray-700">Informasi Umum</CardTitle>
                     </CardHeader>
                     <CardContent className="px-0 space-y-4">
                         
-                        {/* Judul Materi */}
                         <FormField
                             control={form.control}
                             name="judul"
@@ -135,7 +246,6 @@ const AddMateriForm: React.FC<AddMateriFormProps> = ({ onAddMateri, onCancel, in
                             )}
                         />
 
-                        {/* Deskripsi Singkat */}
                         <FormField
                             control={form.control}
                             name="deskripsi"
@@ -155,53 +265,50 @@ const AddMateriForm: React.FC<AddMateriFormProps> = ({ onAddMateri, onCancel, in
                             )}
                         />
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* Jenis Materi */}
-                            <FormField
-                                control={form.control}
-                                name="jenisMateri"
-                                rules={{ required: "Jenis materi harus dipilih!" }}
-                                render={({ field, fieldState: { error } }) => (
-                                    <FormItem>
-                                        <FormLabel>Jenis Materi <span className="text-red-500">*</span></FormLabel>
-                                        <FormControl>
-                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                                <SelectTrigger className="bg-white">
-                                                    <SelectValue placeholder="Pilih Jenis" />
-                                                </SelectTrigger>
-                                                <SelectContent className="bg-white">
-                                                    <SelectItem value="Dokumen">Dokumen PDF</SelectItem>
-                                                    <SelectItem value="Video">Video Youtube</SelectItem>
-                                                    <SelectItem value="Teks">Teks / Artikel</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </FormControl>
-                                        {error && <p className="text-red-600 text-sm">{error.message}</p>}
-                                    </FormItem>
-                                )}
-                            />
-                        </div>
+                        {/* Jenis Materi */}
+                        <FormField
+                            control={form.control}
+                            name="jenisMateri"
+                            rules={{ required: "Jenis materi harus dipilih!" }}
+                            render={({ field, fieldState: { error } }) => (
+                                <FormItem>
+                                    <FormLabel>Jenis Materi <span className="text-red-500">*</span></FormLabel>
+                                    <FormControl>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                            <SelectTrigger className="w-full bg-white">
+                                                <SelectValue placeholder="Pilih Jenis" />
+                                            </SelectTrigger>
+                                            <SelectContent className="bg-white">
+                                                <SelectItem value="Dokumen">Dokumen PDF</SelectItem>
+                                                <SelectItem value="Video">Video Youtube</SelectItem>
+                                                <SelectItem value="Teks">Teks / Artikel</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </FormControl>
+                                    {error && <p className="text-red-600 text-sm">{error.message}</p>}
+                                </FormItem>
+                            )}
+                        />
+
                     </CardContent>
                 </Card>
             </div>
 
             {/* --- KOLOM KANAN (Dynamic Content) --- */}
-            <div className="lg:col-span-1 space-y-4">
+            <div className="space-y-4">
                  <Card className="shadow-none border-0 p-0 h-full">
                     <CardHeader className="px-0 pt-0 pb-4">
-                        <CardTitle className="text-lg text-gray-700">Upload Materi</CardTitle>
+                        <CardTitle className="text-lg text-gray-700">Konten Materi</CardTitle>
                     </CardHeader>
                     <CardContent className="px-0 h-full">
                         
-                        {/* KONDISI 0: BELUM MEMILIH JENIS (DEFAULT VIEW) */}
                         {!jenisMateri && (
                             <div className="flex flex-col items-center justify-center h-full min-h-[300px] border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50 text-gray-400 p-6 text-center">
                                 <FaInfoCircle className="h-8 w-8 mb-3 opacity-50" />
-                                <p className="text-sm font-medium">Pilih <strong>Jenis Materi</strong> terlebih dahulu!.</p>
+                                <p className="text-sm font-medium">Pilih <strong>Jenis Materi</strong> terlebih dahulu!</p>
                             </div>
                         )}
 
-                        {/* KONDISI 1: DOKUMEN PDF */}
                         {jenisMateri === 'Dokumen' && (
                             <FormField
                                 control={form.control}
@@ -214,13 +321,10 @@ const AddMateriForm: React.FC<AddMateriFormProps> = ({ onAddMateri, onCancel, in
                                             <div className="bg-blue-100 p-4 rounded-full mb-4 group-hover:scale-110 transition-transform">
                                                 <FaCloudUploadAlt className="h-10 w-10 text-blue-600" />
                                             </div>
-                                            
                                             <span className="text-sm font-semibold text-gray-700">
                                                 {fileName ? fileName : "Klik atau Drop file PDF di sini"}
                                             </span>
-                                            <span className="text-xs text-gray-500 mt-2">
-                                                Max size: 6 MB
-                                            </span>
+                                            <span className="text-xs text-gray-500 mt-2">Max size: 6 MB</span>
 
                                             <Input 
                                                 type="file" 
@@ -240,7 +344,6 @@ const AddMateriForm: React.FC<AddMateriFormProps> = ({ onAddMateri, onCancel, in
                             />
                         )}
 
-                        {/* KONDISI 2: VIDEO YOUTUBE */}
                         {jenisMateri === 'Video' && (
                             <FormField
                                 control={form.control}
@@ -275,28 +378,36 @@ const AddMateriForm: React.FC<AddMateriFormProps> = ({ onAddMateri, onCancel, in
                             />
                         )}
 
-                        {/* KONDISI 3: TEKS ARTIKEL */}
+                        {/* --- EDITOR TEKS DENGAN GAMBAR VISUAL --- */}
                         {jenisMateri === 'Teks' && (
                             <FormField
                                 control={form.control}
                                 name="isiArtikel"
                                 rules={{ required: "Isi artikel harus diisi!" }}
                                 render={({ field, fieldState: { error } }) => (
-                                    <FormItem className="h-full flex flex-col">
-                                        <FormLabel>Isi Artikel / Materi Pembelajaran</FormLabel>
-                                        <FormControl>
-                                            <div className="flex-grow">
-                                                <textarea 
-                                                    {...field} 
-                                                    className="w-full min-h-[400px] p-4 bg-gray-50 font-serif leading-relaxed text-gray-700 resize-none focus:bg-white transition-all border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                                                    placeholder="Mulailah menulis materi pelajaran di sini..."
-                                                />
-                                            </div>
-                                        </FormControl>
-                                        <p className="text-xs text-gray-400 text-right mt-1">
-                                            <FaAlignLeft className="inline mr-1"/> Mendukung teks panjang (scrollable)
-                                        </p>
-                                        {error && <p className="text-red-600 text-sm">{error.message}</p>}
+                                    <FormItem className="flex flex-col">
+                                        <FormLabel className="mb-2">Isi Artikel / Materi Pembelajaran</FormLabel>
+                                        
+                                        {/* Wrapper dengan margin bottom agar tidak menutupi tombol */}
+                                        <div className="editor-wrapper">
+                                            <Controller
+                                                name="isiArtikel"
+                                                control={form.control}
+                                                render={({ field: { onChange, value } }) => (
+                                                    <ReactQuill 
+                                                        ref={quillRef}
+                                                        theme="snow"
+                                                        value={value || ''} 
+                                                        onChange={onChange} 
+                                                        modules={modules}
+                                                        formats={formats}
+                                                        placeholder="Tulis materi artikel di sini... Klik icon gambar untuk insert."
+                                                    />
+                                                )}
+                                            />
+                                        </div>
+
+                                        {error && <p className="text-red-600 text-sm mt-1">{error.message}</p>}
                                     </FormItem>
                                 )}
                             />
@@ -307,20 +418,13 @@ const AddMateriForm: React.FC<AddMateriFormProps> = ({ onAddMateri, onCancel, in
             </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex justify-end space-x-4 pt-6 border-t mt-4">
-            <Button 
-                onClick={onCancel} 
-                type="button" 
-                className="bg-blue-50 text-blue-700 border-2 border-blue-700 py-2 px-6 rounded-full hover:bg-blue-700 hover:text-white transition-colors"
-            >
+        {/* Action Buttons - Diberi margin top besar agar aman */}
+        <div className="flex justify-end space-x-4 pt-8 border-t mt-8">
+            <Button onClick={onCancel} type="button" className="bg-blue-50 text-blue-700 border-2 border-blue-700 py-2 px-6 rounded-full hover:bg-blue-700 hover:text-white transition-colors">
                 Batal
             </Button>
-            <Button 
-                type="submit" 
-                className="bg-blue-50 text-blue-700 border-2 border-blue-700 py-2 px-6 rounded-full hover:bg-blue-700 hover:text-white transition-colors"
-            >
-                Simpan Materi
+            <Button type="submit" className="bg-blue-50 text-blue-700 border-2 border-blue-700 py-2 px-6 rounded-full hover:bg-blue-700 hover:text-white transition-colors">
+                Simpan
             </Button>
         </div>
 
