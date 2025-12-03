@@ -1,0 +1,577 @@
+import React, { useState, useEffect, useRef } from "react";
+import { useNavigate, useParams, Link } from "react-router-dom";
+import LayoutForm from "@/pages/LayoutForm";
+import logo_polban from "../assets/logo/polban.png";
+import { ClipLoader } from "react-spinners";
+import ReactPlayer from 'react-player';
+import { PDFViewer } from "@/components/custom/PDFViewer";
+import { FaDownload, FaExternalLinkAlt } from "react-icons/fa";
+import ReactMarkdown from 'react-markdown';
+import showdown from 'showdown';
+
+// --- Types ---
+type MaterialData = {
+  id_materi: string;
+  judul_materi: string;
+  deskripsi_materi: string;
+  jenis_materi: 'text' | 'pdf' | 'video';
+  file_materi: string | null;
+  text_materi: string | null;
+  video_materi: string | null;
+};
+
+type TopicData = {
+  nama_topik: string;
+  deskripsi_topik: string;
+};
+
+// --- Helper Components for Content ---
+const TextContent: React.FC<{ content: string }> = ({ content }) => {
+  // 1. Ambil API URL (Sama seperti di komponen lain)
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+  return (
+    <div className="bg-white p-8 shadow-sm rounded-lg text-gray-800 leading-relaxed min-h-[400px] overflow-auto">
+      <ReactMarkdown
+        components={{
+          // 2. Custom Image Styling: Deteksi link gambar dan perbaiki URL-nya
+          img: ({node, ...props}) => {
+            let imgSrc = props.src;
+            
+            // Jika src ada dan BUKAN link eksternal (tidak mulai dengan http)
+            // Maka anggap ini file dari folder 'materi_uploaded' backend
+            if (imgSrc && !imgSrc.startsWith('http')) {
+              imgSrc = `${apiUrl}/materi_uploaded/${imgSrc}`;
+            }
+
+            return (
+              <div className="flex justify-center my-6">
+                <img 
+                  {...props} 
+                  src={imgSrc} // Gunakan URL yang sudah diperbaiki
+                  className="max-w-full h-auto rounded-lg shadow-md border border-gray-200"
+                  alt={props.alt || "Materi Image"}
+                />
+              </div>
+            );
+          },
+          // Komponen lainnya tetap sama
+          p: ({node, ...props}) => (
+            <p {...props} className="mb-4 whitespace-pre-wrap text-justify" />
+          ),
+          h1: ({node, ...props}) => <h1 {...props} className="text-2xl font-bold mb-4 mt-6 text-blue-800" />,
+          h2: ({node, ...props}) => <h2 {...props} className="text-xl font-bold mb-3 mt-5 text-gray-800" />,
+          ul: ({node, ...props}) => <ul {...props} className="list-disc pl-6 mb-4" />,
+          li: ({node, ...props}) => <li {...props} className="mb-1" />,
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
+};
+
+const PdfContent: React.FC<{ content: string }> = ({ content }) => {
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+  const pdfUrl = `${apiUrl}/materi_uploaded/${content}`;
+  
+  return (
+    <div className="bg-gray-50 rounded-lg shadow-sm">
+      <PDFViewer fileUrl={pdfUrl} fileName={content} />
+    </div>
+  );
+};
+
+const VideoContent: React.FC<{ content: string }> = ({ content }) => (
+  <div className="bg-black p-0 rounded-lg shadow-sm flex justify-center items-center overflow-hidden aspect-video mx-auto w-3/4">
+    <ReactPlayer 
+      src={content} 
+      controls
+      playing
+      width="100%"
+      height="100%"
+    />
+  </div>
+);
+
+const MateriPage: React.FC = () => {
+  const navigate = useNavigate();
+  const { topicId, materiId } = useParams<{ topicId: string; materiId: string }>();
+
+  // --- Config & State ---
+  const apiUrl = import.meta.env.VITE_API_URL;
+  
+  const [materials, setMaterials] = useState<MaterialData[]>([]);
+  const [activeMaterial, setActiveMaterial] = useState<MaterialData | null>(null);
+  const [topicData, setTopicData] = useState<TopicData | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // --- 1. Fetch Data ---
+  useEffect(() => {
+    const sessionData = localStorage.getItem('session');
+    
+    if (!sessionData) {
+      navigate("/login");
+      return;
+    }
+
+    const session = JSON.parse(sessionData);
+    
+    if (session.login_type !== "student") {
+      navigate("/dashboard-teacher");
+      return;
+    }
+
+    const fetchTopicAndMaterials = async () => {
+      setIsLoading(true);
+      setError(null);
+      
+      try {
+        // Fetch topic info
+        const topicRes = await fetch(`${apiUrl}/api/topik-pembelajaran`, {
+          headers: { 
+            Authorization: `Bearer ${session.token}`,
+            'Content-Type': 'application/json'
+          },
+        });
+
+        if (topicRes.ok) {
+          const topicDataAll = await topicRes.json();
+          const currentTopic = topicDataAll.topik.find((t: any) => t.id === topicId);
+          if (currentTopic) {
+            setTopicData({
+              nama_topik: currentTopic.nama,
+              deskripsi_topik: currentTopic.deskripsi
+            });
+          }
+        }
+
+        // Fetch materials
+        const res = await fetch(`${apiUrl}/api/topik/${topicId}/materials`, {
+          headers: { 
+            Authorization: `Bearer ${session.token}`,
+            'Content-Type': 'application/json'
+          },
+        });
+        
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        
+        const data = await res.json();
+        
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        
+        if (data.materials && Array.isArray(data.materials) && data.materials.length > 0) {
+          setMaterials(data.materials);
+        } else {
+          setMaterials([]);
+          setError("Tidak ada materi yang tersedia untuk topik ini.");
+        }
+      } catch (error) {
+        console.error("Failed to load materials:", error);
+        setMaterials([]);
+        setError(`Gagal memuat materi: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (topicId) {
+      fetchTopicAndMaterials();
+    } else {
+      setError("Topic ID tidak ditemukan");
+    }
+  }, [topicId, navigate, apiUrl]);
+
+  // --- 3. Scroll Sidebar to Active Item ---
+  useEffect(() => {
+    if (activeMaterial && sidebarRef.current) {
+      const index = materials.findIndex(m => m.id_materi === activeMaterial.id_materi);
+      if (index !== -1) {
+         const buttons = sidebarRef.current.querySelectorAll('button');
+         if (buttons[index]) {
+            buttons[index].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+         }
+      }
+    }
+  }, [activeMaterial, materials]);
+
+  // --- 2. Set Active Material based on URL ---
+  useEffect(() => {
+    if (materials.length > 0 && materiId) {
+      const current = materials.find((m) => m.id_materi === materiId);
+      
+      if (current) {
+        setActiveMaterial(current);
+      } else {
+        setActiveMaterial(materials[0]);
+      }
+    } else if (materials.length > 0 && !materiId) {
+      setActiveMaterial(materials[0]);
+    }
+  }, [materiId, materials]);
+
+  // --- 3. Navigation Logic ---
+  const currentIndex = materials.findIndex(m => m.id_materi === activeMaterial?.id_materi);
+  
+  const showPrevious = currentIndex > 0;
+  const showNext = currentIndex < materials.length - 1;
+
+  const handleNavigate = (targetId: string) => {
+    navigate(`/topic/${topicId}/materi/${targetId}`);
+  };
+
+  const getContentFromMaterial = (material: MaterialData): string => {
+    if (material.jenis_materi === 'pdf') return material.file_materi || '';
+    if (material.jenis_materi === 'text') return material.text_materi || '';
+    if (material.jenis_materi === 'video') return material.video_materi || '';
+    return '';
+  };
+
+  const sidebarRef = useRef<HTMLDivElement>(null);
+
+  const handleScrollUp = () => {
+    if (sidebarRef.current) {
+      sidebarRef.current.scrollBy({ top: -200, behavior: "smooth" });
+    }
+  };
+
+  const handleScrollDown = () => {
+    if (sidebarRef.current) {
+      sidebarRef.current.scrollBy({ top: 200, behavior: "smooth" });
+    }
+  };
+
+  const handleOpenNewTab = () => {
+    if (!activeMaterial) return;
+
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+    if (activeMaterial.jenis_materi === 'text') {
+      // --- FIX: Pre-process Markdown to add Backend URL to images ---
+      // This finds ![Alt](filename.png) and turns it into ![Alt](http://.../filename.png)
+      const rawContent = activeMaterial.text_materi || "";
+      const contentWithFixedImages = rawContent.replace(
+        /!\[([^\]]*)\]\(([^)]+)\)/g,
+        (match, alt, src) => {
+          // If it's already a full URL (http...), leave it alone
+          if (src.startsWith('http')) return match;
+          
+          // Otherwise, force it to look at your backend folder
+          // Removes any leading slash from src to avoid double slashes
+          const cleanSrc = src.replace(/^\//, '');
+          const fullUrl = `${apiUrl}/materi_uploaded/${cleanSrc}`;
+          return `![${alt}](${fullUrl})`;
+        }
+      );
+
+      // 1. Convert the content
+      const converter = new showdown.Converter();
+      const htmlBody = converter.makeHtml(contentWithFixedImages);
+
+      // 2. Create a full HTML page structure with some basic styling
+      const htmlPage = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>${activeMaterial.judul_materi}</title>
+          <style>
+            body { 
+              font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
+              padding: 40px; 
+              max-width: 800px; 
+              margin: 0 auto; 
+              line-height: 1.6; 
+              color: #374151;
+            }
+            h1 { color: #1e40af; margin-bottom: 20px; }
+            h2 { color: #1f2937; margin-top: 30px; }
+            p { margin-bottom: 15px; text-align: justify; }
+            
+            img { 
+              max-width: 100%; 
+              height: auto; 
+              display: block; 
+              margin: 20px auto; 
+              border-radius: 8px; 
+              box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); 
+              border: 1px solid #e5e7eb;
+            }
+          </style>
+        </head>
+        <body>
+          <h1>${activeMaterial.judul_materi}</h1>
+          ${htmlBody}
+        </body>
+        </html>
+      `;
+
+      const blob = new Blob([htmlPage], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+
+    } else if (activeMaterial.jenis_materi === 'pdf') {
+      let url = activeMaterial.file_materi || "";
+      if (!url.startsWith('http') && !url.startsWith('/')) {
+         url = `${apiUrl}/materi_uploaded/${url}`;
+      } else if (url.startsWith('/')) {
+         url = `${apiUrl}${url}`;
+      }
+      window.open(url, '_blank');
+
+    } else {
+      // Video
+      const videoUrl = activeMaterial.video_materi || "";
+      window.open(videoUrl, '_blank');
+    }
+  };
+
+  const handleDownload = async () => {
+    if (!activeMaterial) return;
+
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+    // --- 1. Handle TEXT (Convert to Word .doc) ---
+    if (activeMaterial.jenis_materi === 'text') {
+      
+      // --- FIX: Pre-process Markdown images for Word ---
+      const rawContent = activeMaterial.text_materi || "";
+      const contentWithFixedImages = rawContent.replace(
+        /!\[([^\]]*)\]\(([^)]+)\)/g,
+        (match, alt, src) => {
+          if (src.startsWith('http')) return match;
+          const cleanSrc = src.replace(/^\//, '');
+          const fullUrl = `${apiUrl}/materi_uploaded/${cleanSrc}`;
+          return `![${alt}](${fullUrl})`;
+        }
+      );
+
+      const converter = new showdown.Converter();
+      const htmlContent = converter.makeHtml(contentWithFixedImages);
+
+      const documentContent = `
+        <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+        <head><meta charset='utf-8'><title>${activeMaterial.judul_materi}</title></head>
+        <body>
+          <h1>${activeMaterial.judul_materi}</h1>
+          ${htmlContent}
+        </body>
+        </html>
+      `;
+
+      const blob = new Blob([documentContent], { type: 'application/msword' });
+      const url = URL.createObjectURL(blob);
+      
+      const element = document.createElement("a");
+      element.href = url;
+      element.download = `${activeMaterial.judul_materi.replace(/\s+/g, '_')}.doc`;
+      
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
+      URL.revokeObjectURL(url);
+      
+    } else if (activeMaterial.jenis_materi === 'pdf') {
+      // --- 2. Handle PDF Download ---
+      let url = activeMaterial.file_materi || "";
+      if (!url.startsWith('http') && !url.startsWith('/')) {
+         url = `${apiUrl}/materi_uploaded/${url}`;
+      } else if (url.startsWith('/')) {
+         url = `${apiUrl}${url}`;
+      }
+      
+      try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = `${activeMaterial.judul_materi.replace(/\s+/g, '_')}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(blobUrl);
+      } catch (error) {
+        console.error("Download failed:", error);
+        window.open(url, '_blank');
+      }
+
+    } else {
+      // --- 3. Handle Video Download (Link Copy) ---
+      const videoUrl = activeMaterial.video_materi || "";
+      navigator.clipboard.writeText(videoUrl)
+        .then(() => alert("Link YouTube berhasil disalin!"))
+        .catch(() => console.log("Clipboard failed"));
+      window.open("https://y2mate.nu/ysM1/", "_blank");
+    }
+  };
+
+  const handleNext = () => {
+    if (showNext) handleNavigate(materials[currentIndex + 1].id_materi);
+  };
+
+  const handlePrev = () => {
+    if (showPrevious) handleNavigate(materials[currentIndex - 1].id_materi);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-white z-50">
+        <ClipLoader size={50} color={"#1e40af"} loading={true} />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen w-screen bg-gray-100 flex flex-col font-sans">
+        <header className="flex items-center justify-between w-full px-6 py-3 bg-blue-900 text-white shadow-md">
+          <div className="flex items-center gap-3">
+            <img src={logo_polban} alt="Polban Logo" className="w-10 h-10" />
+            <h1 className="text-xl font-bold">Coverage Test</h1>
+          </div>
+          <Link to="/topic" className="text-white font-semibold hover:text-gray-200 transition-colors text-sm">
+            Kembali
+          </Link>
+        </header>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-red-600 text-lg mb-4">{error}</p>
+            <Link to="/topic" className="bg-blue-700 text-white px-6 py-2 rounded-md font-semibold hover:bg-blue-800">
+              Kembali ke Topik
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <LayoutForm 
+      screenName={topicData?.nama_topik || "Materi Pembelajaran"}
+      backUrl="/topic" 
+    >
+
+      <div className="bg-white px-6 py-6 shadow-sm">
+        <h2 className="text-xl font-bold text-gray-900">
+          {topicData?.nama_topik || "Loading..."} 
+        </h2>
+        <h3 className="text-lg font-bold text-gray-800 mt-1">
+          {activeMaterial?.judul_materi || ""}
+        </h3>
+        <p className="text-gray-600 mt-2 text-sm">
+          {activeMaterial?.deskripsi_materi || ""} 
+        </p>
+      </div>
+
+      <div className="flex flex-col md:flex-row w-screen min-h-screen">
+        <div className="flex flex-col md:flex-row w-screen min-h-screen gap-8 ml-10 mr-10 mt-10 mb-10">
+            
+          <div className="w-full lg:w-72 flex-shrink-0 flex flex-col gap-2">
+            <div 
+              onClick={handleScrollUp}
+              className="bg-blue-800 text-white py-2 text-center rounded-t-xl text-xs font-bold cursor-pointer hover:bg-blue-700 shadow-sm transition-colors select-none"
+            >
+              ^
+            </div>
+
+            <div 
+              ref={sidebarRef} 
+              className="flex flex-col gap-2 overflow-y-auto max-h-[500px] lg:max-h-[calc(100vh-300px)] pr-1 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent"
+            >
+              {materials.map((material, index) => {
+                const isActive = activeMaterial?.id_materi === material.id_materi;
+                return (
+                  <button
+                    key={material.id_materi}
+                    onClick={() => handleNavigate(material.id_materi)}
+                    className={`
+                      w-full text-left px-4 py-3 rounded-x1 text-sm font-semibold transition-all duration-200 border flex-shrink-0
+                      ${isActive 
+                        ? "bg-blue-700 text-white border-blue-700 shadow-md transform translate-x-1" 
+                        : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:text-blue-800 hover:border-blue-300"
+                      }
+                    `}
+                  >
+                    <div className="flex gap-2">
+                        <span className="opacity-70 font-normal min-w-[20px]">{index + 1}.</span>
+                        <span className="break-words">{material.judul_materi}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div 
+              onClick={handleScrollDown}
+              className="bg-blue-800 text-white py-2 text-center rounded-b-xl text-xs font-bold cursor-pointer hover:bg-blue-700 shadow-sm transition-colors select-none"
+            >
+              v
+            </div>
+          </div>
+
+          <div className="w-full lg:flex-1 flex flex-col gap-4">
+            <div className="self-end w-fit flex flex-row items-center gap-3 bg-white p-2 rounded-lg shadow-sm">
+              <div className="flex gap-3 w-full sm:w-auto">
+                <button 
+                  onClick={handleDownload}
+                  className="flex-1 sm:flex-none bg-blue-700 text-white px-5 py-2 rounded-md font-semibold hover:bg-blue-800 transition-colors flex items-center gap-2 text-sm shadow-sm"
+                >
+                  <FaDownload /> <span className="hidden sm:inline">Unduh</span>
+                </button>
+              <button 
+                  onClick={handleOpenNewTab}
+                  className="flex-1 sm:flex-none bg-white text-blue-800 border border-blue-800 px-4 py-2 rounded-md text-sm font-bold hover:bg-blue-50 transition-colors flex items-center justify-center gap-2 shadow-sm"
+              >
+                  <FaExternalLinkAlt /> <span className="hidden sm:inline">Buka Di Tab Baru</span>
+              </button>
+              </div>
+            </div>
+
+            <div className="min-h-[500px] bg-white rounded-lg shadow-sm p-6">
+              {activeMaterial ? (
+                <>
+                  {activeMaterial.jenis_materi === 'text' && <TextContent content={getContentFromMaterial(activeMaterial)} />}
+                  {activeMaterial.jenis_materi === 'pdf' && <PdfContent content={getContentFromMaterial(activeMaterial)} />}
+                  {activeMaterial.jenis_materi === 'video' && <VideoContent content={getContentFromMaterial(activeMaterial)} />}
+                </>
+              ) : (
+                <div className="flex items-center justify-end h-full text-gray-400 p-8">
+                  Pilih materi dari menu di samping.
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end items-center pt-4 gap-3">
+              {showPrevious && (
+                <button 
+                  onClick={handlePrev} 
+                  className="bg-white text-gray-700 px-6 py-2 rounded-md font-semibold hover:bg-gray-100 transition-colors border border-gray-300 shadow-sm flex items-center justify-center gap-2"
+                >
+                  Sebelumnya
+                </button>
+              )}
+
+              {showNext && (
+                <button 
+                  onClick={handleNext} 
+                  className="bg-blue-700 text-white px-6 py-2 rounded-md font-semibold hover:bg-blue-800 transition-colors shadow-md flex items-center justify-center gap-2"
+                >
+                  Berikutnya
+                </button>
+              )}
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </LayoutForm>
+  );
+};
+
+export default MateriPage;
