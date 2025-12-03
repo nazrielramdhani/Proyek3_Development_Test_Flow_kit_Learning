@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -25,6 +25,9 @@ import uvicorn
 import locale
 import os
 
+from sqlalchemy.sql import text
+from config.database import conn
+
 # --- Locale: aman untuk Windows & Linux ---
 try:
     # Linux/macOS
@@ -38,7 +41,13 @@ except Exception:
         pass
 
 # Ubah ke /docs kalau mau default Swagger URL
-app = FastAPI(docs_url="/doc")
+app = FastAPI(
+    title="Test Flow Kit Learning API",
+    description="API untuk aplikasi pembelajaran berbasis test coverage",
+    version="1.1.0",
+    docs_url="/docs",
+    redoc_url="/redoc"
+)
 
 
 def cors_headers(app: FastAPI) -> FastAPI:
@@ -78,10 +87,96 @@ if not os.path.exists("static"):
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+# --- Files dir untuk PDF ---
+if not os.path.exists("materi_uploaded"):
+    os.makedirs("materi_uploaded")
+
+app.mount("/materi_uploaded", StaticFiles(directory="materi_uploaded"), name="materi_uploaded")
+
+# --- Materi uploaded dir untuk PDF dari teacher ---
+if not os.path.exists("materi_uploaded"):
+    os.makedirs("materi_uploaded")
+
+app.mount("/materi_uploaded", StaticFiles(directory="materi_uploaded"), name="materi_uploaded")
+
 
 @app.get("/")
 async def root():
     return {"message": "SAS API version 1.1"}
+
+@app.get(
+    "/api/topik-pembelajaran",
+    tags=["Topik Pembelajaran"],
+    summary="Get all published topics",
+    response_description="List of published learning topics"
+)
+def get_topik_pembelajaran():
+    """
+    Mengambil semua topik pembelajaran yang sudah dipublish.
+    
+    Returns:
+    - **topik**: Array of topic objects dengan first_materi_id
+    """
+    # Updated query: ONLY fetch from ms_topik
+    # We removed the 'UNION ALL' part that was pulling from ms_materi
+    sql_query = text("""
+        SELECT 
+            t.id_topik AS id, 
+            t.nama_topik AS nama, 
+            t.deskripsi_topik AS deskripsi, 
+            'topic' AS type,
+            (SELECT tm.id_materi 
+             FROM topik_materi tm 
+             WHERE tm.id_topik = t.id_topik 
+             ORDER BY tm.created_at ASC 
+             LIMIT 1) AS first_materi_id
+        FROM ms_topik t
+        WHERE t.status_tayang = 1
+    """)
+    
+    try:
+        results = conn.execute(sql_query).mappings().all()
+        return {"topik": results}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get(
+    "/api/topik/{id_topik}/materials",
+    tags=["Materi Pembelajaran"],
+    summary="Get all materials for a topic",
+    response_description="List of materials for the specified topic"
+)
+def get_materials_by_topic(id_topik: str):
+    """
+    Mengambil semua materi pembelajaran untuk topik tertentu.
+    
+    - **id_topik**: ID topik yang ingin diambil materinya
+    
+    Returns:
+    - **materials**: Array of material objects with Indonesian field names
+    """
+    sql_query = text("""
+        SELECT 
+            m.id_materi,
+            m.judul_materi,
+            m.deskripsi_materi,
+            m.jenis_materi,
+            m.file_materi,
+            m.text_materi,
+            m.video_materi,
+            m.created_at,
+            m.updated_at
+        FROM ms_materi m
+        INNER JOIN topik_materi tm ON m.id_materi = tm.id_materi
+        WHERE tm.id_topik = :id_topik
+        ORDER BY tm.created_at ASC
+    """)
+    try:
+        results = conn.execute(sql_query, {"id_topik": id_topik}).mappings().all()
+        return {"materials": results}
+    except Exception as e:
+        return {"error": str(e)}
 
 
 # --- Jadwal (nonaktif, aktifkan kalau diperlukan) ---

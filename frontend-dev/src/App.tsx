@@ -21,6 +21,9 @@ import ListLearningTopicsPage from "./pages/ListLearningTopicsPage";
 import ListMateriPage from "./pages/ListMateriPage";
 import TopicDetailPage from "./pages/TopikDetailPage";
 import MateriDetailPage from "./pages/MateriDetailPage";
+import TopicPage from "./pages/TopicPage";
+import MateriPage from "./pages/MateriPage";
+
 
 function App() {
   return (
@@ -48,6 +51,8 @@ function App() {
         <Route path="/learning-materi" element={<ListMateriPage />} />
         <Route path="/Topic-Detail" element={<TopicDetailPage />} />
         <Route path="/add-materi" element={<MateriDetailPage />} />
+        <Route path="/topic" element={<TopicPage />} />
+        <Route path="/topic/:topicId/materi/:materiId" element={<MateriPage />} />
       </Routes>
     </BrowserRouter>
   );
