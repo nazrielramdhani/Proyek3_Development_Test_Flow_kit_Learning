@@ -1,25 +1,21 @@
-from fastapi import APIRouter, HTTPException, Form, UploadFile, File, Path
+from fastapi import APIRouter, HTTPException, Query, Path, UploadFile, File, Form
 from config.database import conn
-from schemas.materi_pembelajaran import MateriOut
+from schemas.materi_pembelajaran import MateriCreate, MateriUpdate, MateriOut
 from models.materi_pembelajaran import MateriPembelajaran
 from sqlalchemy import select, text
 import uuid
 import os
-import json
-from dotenv import load_dotenv
 
+# Router utama untuk seluruh endpoint materi pembelajaran
 router = APIRouter(prefix="", tags=["materi_pembelajaran"])
 
-# Load .env
-load_dotenv()
-PDF_DIR = os.getenv("PATH_PDF_URL")       # materi_uploaded/pdf
-IMG_DIR = os.getenv("PATH_IMG_URL")       # materi_uploaded/img
-
-os.makedirs(PDF_DIR, exist_ok=True)
-os.makedirs(IMG_DIR, exist_ok=True)
+# Folder penyimpanan file materi 
+UPLOAD_DIR = "materi_uploaded"
+if not os.path.exists(UPLOAD_DIR):
+    os.makedirs(UPLOAD_DIR)
 
 # ============================================================
-# CREATE — Upload PDF + multiple images + metadata
+# CREATE — Upload file + simpan metadata
 # ============================================================
 @router.post("/materi")
 def create_materi(
@@ -28,52 +24,29 @@ def create_materi(
     jenis_materi: str = Form(None),
     text_materi: str = Form(None),
     video_materi: str = Form(None),
-    file_materi: UploadFile = File(None),
-    images: list[UploadFile] = File(None)
+    file_materi: UploadFile = File(None)
 ):
     id_ = str(uuid.uuid4())
 
-    # ======================
-    # Upload PDF
-    # ======================
-    saved_pdf = None
+    saved_filename = None
     if file_materi:
+        # Validasi hanya file PDF
         if not file_materi.filename.lower().endswith(".pdf"):
-            raise HTTPException(400, "File harus PDF")
+            raise HTTPException(status_code=400, detail="File harus berformat PDF")
 
-        saved_pdf = f"{id_}.pdf"
-        pdf_path = os.path.join(PDF_DIR, saved_pdf)
+        saved_filename = f"{id_}.pdf"
+        save_path = os.path.join(UPLOAD_DIR, saved_filename)
 
-        with open(pdf_path, "wb") as f:
+        # Simpan file PDF ke server
+        with open(save_path, "wb") as f:
             f.write(file_materi.file.read())
 
-    # ======================
-    # Upload Multiple Images
-    # ======================
-    saved_images = []
-
-    if images:
-        for img in images:
-            ext = os.path.splitext(img.filename)[1].lower()
-            if ext not in [".jpg", ".jpeg", ".png", ".webp"]:
-                raise HTTPException(400, "Format gambar tidak valid")
-
-            img_name = f"{uuid.uuid4()}{ext}"
-            img_path = os.path.join(IMG_DIR, img_name)
-
-            with open(img_path, "wb") as f:
-                f.write(img.file.read())
-
-            saved_images.append(img_name)
-
-    # Simpan ke DB (image_materi dalam bentuk JSON string)
     ins = MateriPembelajaran.insert().values(
         id_materi=id_,
         judul_materi=judul_materi,
         deskripsi_materi=deskripsi_materi,
         jenis_materi=jenis_materi,
-        file_materi=saved_pdf,
-        image_materi=json.dumps(saved_images),
+        file_materi=saved_filename,
         text_materi=text_materi,
         video_materi=video_materi
     )
@@ -83,39 +56,35 @@ def create_materi(
 
 
 # ============================================================
-# READ — list semua materi
+# READ — Mengambil seluruh data materi pembelajaran
 # ============================================================
 @router.get("/materi", response_model=list[MateriOut])
 def list_all_materi():
-    rows = conn.execute(select(MateriPembelajaran)).mappings().all()
-
-    # Convert JSON string → list
-    for r in rows:
-        if r["image_materi"]:
-            r["image_materi"] = json.loads(r["image_materi"])
-
+    # Select semua kolom dari tabel ms_materi
+    q = select(MateriPembelajaran)
+    rows = conn.execute(q).mappings().all()
+    # Return list of dict agar frontend menerima JSON murni
     return [dict(r) for r in rows]
 
 
 # ============================================================
-# READ by ID 
+# READ by ID — Mengambil 1 materi berdasarkan id_materi
 # ============================================================
 @router.get("/materi/{id_materi}", response_model=MateriOut)
 def get_materi(id_materi: str):
+    # Query mencari materi berdasarkan ID
     q = select(MateriPembelajaran).where(MateriPembelajaran.c.id_materi == id_materi)
     r = conn.execute(q).mappings().first()
 
+    # Jika tidak ditemukan → error 404
     if not r:
-        raise HTTPException(404, "Materi tidak ditemukan")
-
-    if r["image_materi"]:
-        r["image_materi"] = json.loads(r["image_materi"])
+        raise HTTPException(status_code=404, detail="Materi tidak ditemukan")
 
     return dict(r)
 
 
 # ============================================================
-# UPDATE — update PDF, images, atau metadata
+# UPDATE — Bisa ganti file PDF + update metadata
 # ============================================================
 @router.put("/materi")
 def update_materi(
@@ -125,45 +94,34 @@ def update_materi(
     jenis_materi: str = Form(None),
     text_materi: str = Form(None),
     video_materi: str = Form(None),
-    file_materi: UploadFile = File(None),
-    images: list[UploadFile] = File(None)
+    file_materi: UploadFile = File(None)
 ):
     upd_vals = {}
 
-    if judul_materi: upd_vals["judul_materi"] = judul_materi
-    if deskripsi_materi: upd_vals["deskripsi_materi"] = deskripsi_materi
-    if jenis_materi: upd_vals["jenis_materi"] = jenis_materi
-    if text_materi: upd_vals["text_materi"] = text_materi
-    if video_materi: upd_vals["video_materi"] = video_materi
+    # Tambahkan field hanya yang dikirim
+    if judul_materi is not None:
+        upd_vals["judul_materi"] = judul_materi
+    if deskripsi_materi is not None:
+        upd_vals["deskripsi_materi"] = deskripsi_materi
+    if jenis_materi is not None:
+        upd_vals["jenis_materi"] = jenis_materi
+    if text_materi is not None:
+        upd_vals["text_materi"] = text_materi
+    if video_materi is not None:
+        upd_vals["video_materi"] = video_materi
 
-    # Update PDF
+    # Jika user ingin upload file baru
     if file_materi:
         if not file_materi.filename.lower().endswith(".pdf"):
-            raise HTTPException(400, "File harus PDF")
+            raise HTTPException(status_code=400, detail="File harus berformat PDF")
 
-        new_pdf = f"{id_materi}.pdf"
-        pdf_path = os.path.join(PDF_DIR, new_pdf)
+        new_filename = f"{id_materi}.pdf"
+        save_path = os.path.join(UPLOAD_DIR, new_filename)
 
-        with open(pdf_path, "wb") as f:
+        with open(save_path, "wb") as f:
             f.write(file_materi.file.read())
 
-        upd_vals["file_materi"] = new_pdf
-
-    # Update Images (replace all)
-    if images:
-        new_imgs = []
-
-        for img in images:
-            ext = os.path.splitext(img.filename)[1].lower()
-            img_name = f"{uuid.uuid4()}{ext}"
-            img_path = os.path.join(IMG_DIR, img_name)
-
-            with open(img_path, "wb") as f:
-                f.write(img.file.read())
-
-            new_imgs.append(img_name)
-
-        upd_vals["image_materi"] = json.dumps(new_imgs)
+        upd_vals["file_materi"] = new_filename
 
     if not upd_vals:
         return {"status": "nochange"}
@@ -173,27 +131,35 @@ def update_materi(
     ).values(**upd_vals)
 
     conn.execute(upd)
-
     return {"status": "ok"}
 
-
 # ============================================================
-# DELETE
+# DELETE — Menghapus materi berdasarkan id_materi
+# Dengan validasi: materi tidak boleh dihapus jika sudah dipakai mahasiswa
 # ============================================================
 @router.delete("/materi/{id_materi}")
 def delete_materi(id_materi: str = Path(...)):
+    # Cek apakah materi sudah terhubung ke topik dan diakses mahasiswa
     sql = text("""
-        SELECT sa.id_student FROM student_access sa
-        JOIN topik_materi tm ON tm.id_topik = sa.id_topik
-        WHERE tm.id_materi = :id
-        LIMIT 1
+    SELECT sa.id_student FROM student_access sa
+    JOIN topik_materi tm ON tm.id_topik = sa.id_topik
+    WHERE tm.id_materi = :id
+    LIMIT 1
     """)
+
     rows = conn.execute(sql, {"id": id_materi}).first()
 
+    # Jika ada mahasiswa yang sudah mengakses → tidak boleh hapus
     if rows:
-        raise HTTPException(400, "Tidak dapat menghapus: sudah diakses mahasiswa")
+        raise HTTPException(
+            status_code=400,
+            detail="Tidak dapat menghapus materi: sudah diakses oleh mahasiswa"
+        )
 
-    conn.execute(
-        MateriPembelajaran.delete().where(MateriPembelajaran.c.id_materi == id_materi)
+    # Jika aman, lakukan delete
+    delq = MateriPembelajaran.delete().where(
+        MateriPembelajaran.c.id_materi == id_materi
     )
+    conn.execute(delq)
+
     return {"status": "ok"}
