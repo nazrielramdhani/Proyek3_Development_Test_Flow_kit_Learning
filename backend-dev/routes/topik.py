@@ -510,7 +510,7 @@ async def mappingTopikModul(request: Request, id_topik: str, response: Response)
     
     return {"message": "sukses mengambil data ", "data": data_moduls}
 
-@topik.post("/topik/{id_topik}/track-access", dependencies=[Depends(JWTBearer())])
+@topik.post("/topik/{id_topik}/track-access", dependencies=[Depends(JWTBearer())], tags=["Topik Pembelajaran"]) 
 async def track_student_access(request: Request, id_topik: str, response: Response):
     """
     Endpoint untuk mencatat akses mahasiswa ke topik pembelajaran.
@@ -587,7 +587,7 @@ async def track_student_access(request: Request, id_topik: str, response: Respon
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
         return {"message": f"Error: {str(e)}"}
 
-@topik.get("/topik/{id_topik}/stats", dependencies=[Depends(JWTBearer())])
+@topik.get("/topik/{id_topik}/stats", dependencies=[Depends(JWTBearer())], tags=["Topik Pembelajaran"])
 async def get_topik_stats(id_topik: str, response: Response):
     """
     Endpoint untuk mendapatkan statistik topik (jumlah mahasiswa yang mengakses).
@@ -624,3 +624,4 @@ async def get_topik_stats(id_topik: str, response: Response):
     except Exception as e:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
         return {"message": f"Error: {str(e)}"}
+    

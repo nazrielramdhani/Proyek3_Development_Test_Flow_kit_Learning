@@ -26,41 +26,54 @@ type TopicData = {
 };
 
 // --- Helper Components for Content ---
-const TextContent: React.FC<{ content: string }> = ({ content }) => (
-  <div className="bg-white p-8 shadow-sm rounded-lg text-gray-800 leading-relaxed min-h-[400px] overflow-auto">
-    <ReactMarkdown
-      components={{
-        // 1. Custom Image Styling: Centers it and makes it responsive
-        img: ({node, ...props}) => (
-          <div className="flex justify-center my-6">
-            <img 
-              {...props} 
-              className="max-w-full h-auto rounded-lg shadow-md border border-gray-200"
-              alt={props.alt || "Materi Image"}
-            />
-          </div>
-        ),
-        // 2. Paragraph Styling: Keeps your text spacing
-        p: ({node, ...props}) => (
-          <p {...props} className="mb-4 whitespace-pre-wrap text-justify" />
-        ),
-        // 3. Header Styling (Optional, enables # H1 and ## H2)
-        h1: ({node, ...props}) => <h1 {...props} className="text-2xl font-bold mb-4 mt-6 text-blue-800" />,
-        h2: ({node, ...props}) => <h2 {...props} className="text-xl font-bold mb-3 mt-5 text-gray-800" />,
-        ul: ({node, ...props}) => <ul {...props} className="list-disc pl-6 mb-4" />,
-        li: ({node, ...props}) => <li {...props} className="mb-1" />,
-      }}
-    >
-      {content}
-    </ReactMarkdown>
-  </div>
-);
+const TextContent: React.FC<{ content: string }> = ({ content }) => {
+  // 1. Ambil API URL (Sama seperti di komponen lain)
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
-  const PdfContent: React.FC<{ content: string }> = ({ content }) => { //buat pdf
+  return (
+    <div className="bg-white p-8 shadow-sm rounded-lg text-gray-800 leading-relaxed min-h-[400px] overflow-auto">
+      <ReactMarkdown
+        components={{
+          // 2. Custom Image Styling: Deteksi link gambar dan perbaiki URL-nya
+          img: ({node, ...props}) => {
+            let imgSrc = props.src;
+            
+            // Jika src ada dan BUKAN link eksternal (tidak mulai dengan http)
+            // Maka anggap ini file dari folder 'materi_uploaded' backend
+            if (imgSrc && !imgSrc.startsWith('http')) {
+              imgSrc = `${apiUrl}/materi_uploaded/${imgSrc}`;
+            }
+
+            return (
+              <div className="flex justify-center my-6">
+                <img 
+                  {...props} 
+                  src={imgSrc} // Gunakan URL yang sudah diperbaiki
+                  className="max-w-full h-auto rounded-lg shadow-md border border-gray-200"
+                  alt={props.alt || "Materi Image"}
+                />
+              </div>
+            );
+          },
+          // Komponen lainnya tetap sama
+          p: ({node, ...props}) => (
+            <p {...props} className="mb-4 whitespace-pre-wrap text-justify" />
+          ),
+          h1: ({node, ...props}) => <h1 {...props} className="text-2xl font-bold mb-4 mt-6 text-blue-800" />,
+          h2: ({node, ...props}) => <h2 {...props} className="text-xl font-bold mb-3 mt-5 text-gray-800" />,
+          ul: ({node, ...props}) => <ul {...props} className="list-disc pl-6 mb-4" />,
+          li: ({node, ...props}) => <li {...props} className="mb-1" />,
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
+};
+
+const PdfContent: React.FC<{ content: string }> = ({ content }) => {
   const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
   const pdfUrl = `${apiUrl}/materi_uploaded/${content}`;
-  
-  console.log('PDF URL:', pdfUrl);
   
   return (
     <div className="bg-gray-50 rounded-lg shadow-sm">
@@ -115,8 +128,6 @@ const MateriPage: React.FC = () => {
       setError(null);
       
       try {
-        console.log(`Fetching data for topic: ${topicId}`);
-        
         // Fetch topic info
         const topicRes = await fetch(`${apiUrl}/api/topik-pembelajaran`, {
           headers: { 
@@ -143,15 +154,12 @@ const MateriPage: React.FC = () => {
             'Content-Type': 'application/json'
           },
         });
-
-        console.log('Response status:', res.status);
         
         if (!res.ok) {
           throw new Error(`HTTP error! status: ${res.status}`);
         }
         
         const data = await res.json();
-        console.log('Received data:', data);
         
         if (data.error) {
           throw new Error(data.error);
@@ -182,8 +190,6 @@ const MateriPage: React.FC = () => {
   // --- 3. Scroll Sidebar to Active Item ---
   useEffect(() => {
     if (activeMaterial && sidebarRef.current) {
-      // Find the button element for the active material
-      // (This assumes the button index matches the material index)
       const index = materials.findIndex(m => m.id_materi === activeMaterial.id_materi);
       if (index !== -1) {
          const buttons = sidebarRef.current.querySelectorAll('button');
@@ -197,16 +203,11 @@ const MateriPage: React.FC = () => {
   // --- 2. Set Active Material based on URL ---
   useEffect(() => {
     if (materials.length > 0 && materiId) {
-      console.log('Looking for material:', materiId);
-      console.log('Available materials:', materials.map(m => m.id_materi));
-      
       const current = materials.find((m) => m.id_materi === materiId);
       
       if (current) {
-        console.log('Found material:', current);
         setActiveMaterial(current);
       } else {
-        console.log('Material not found, defaulting to first');
         setActiveMaterial(materials[0]);
       }
     } else if (materials.length > 0 && !materiId) {
@@ -224,7 +225,6 @@ const MateriPage: React.FC = () => {
     navigate(`/topic/${topicId}/materi/${targetId}`);
   };
 
-  // Helper function untuk mendapatkan content dari material
   const getContentFromMaterial = (material: MaterialData): string => {
     if (material.jenis_materi === 'pdf') return material.file_materi || '';
     if (material.jenis_materi === 'text') return material.text_materi || '';
@@ -249,10 +249,31 @@ const MateriPage: React.FC = () => {
   const handleOpenNewTab = () => {
     if (!activeMaterial) return;
 
-    // --- 1. Handle TEXT (Markdown -> HTML) ---
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
     if (activeMaterial.jenis_materi === 'text') {
+      // --- FIX: Pre-process Markdown to add Backend URL to images ---
+      // This finds ![Alt](filename.png) and turns it into ![Alt](http://.../filename.png)
+      const rawContent = activeMaterial.text_materi || "";
+      const contentWithFixedImages = rawContent.replace(
+        /!\[([^\]]*)\]\(([^)]+)\)/g,
+        (match, alt, src) => {
+          // If it's already a full URL (http...), leave it alone
+          if (src.startsWith('http')) return match;
+          
+          // Otherwise, force it to look at your backend folder
+          // Removes any leading slash from src to avoid double slashes
+          const cleanSrc = src.replace(/^\//, '');
+          const fullUrl = `${apiUrl}/materi_uploaded/${cleanSrc}`;
+          return `![${alt}](${fullUrl})`;
+        }
+      );
+
+      // 1. Convert the content
       const converter = new showdown.Converter();
-      const htmlBody = converter.makeHtml(activeMaterial.text_materi || '');
+      const htmlBody = converter.makeHtml(contentWithFixedImages);
+
+      // 2. Create a full HTML page structure with some basic styling
       const htmlPage = `
         <!DOCTYPE html>
         <html>
@@ -260,8 +281,27 @@ const MateriPage: React.FC = () => {
           <meta charset="utf-8">
           <title>${activeMaterial.judul_materi}</title>
           <style>
-            body { font-family: sans-serif; padding: 40px; max-width: 800px; margin: 0 auto; line-height: 1.6; color: #374151; }
-            img { max-width: 100%; height: auto; display: block; margin: 20px auto; border-radius: 8px; border: 1px solid #e5e7eb; }
+            body { 
+              font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
+              padding: 40px; 
+              max-width: 800px; 
+              margin: 0 auto; 
+              line-height: 1.6; 
+              color: #374151;
+            }
+            h1 { color: #1e40af; margin-bottom: 20px; }
+            h2 { color: #1f2937; margin-top: 30px; }
+            p { margin-bottom: 15px; text-align: justify; }
+            
+            img { 
+              max-width: 100%; 
+              height: auto; 
+              display: block; 
+              margin: 20px auto; 
+              border-radius: 8px; 
+              box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); 
+              border: 1px solid #e5e7eb;
+            }
           </style>
         </head>
         <body>
@@ -270,58 +310,75 @@ const MateriPage: React.FC = () => {
         </body>
         </html>
       `;
+
       const blob = new Blob([htmlPage], { type: 'text/html' });
       const url = URL.createObjectURL(blob);
       window.open(url, '_blank');
 
-    // --- 2. Handle PDF (Fix URL and Open) ---
     } else if (activeMaterial.jenis_materi === 'pdf') {
-      let url = activeMaterial.file_materi || '';
-      
-      // Logic: If it's just a filename (e.g. "doc.pdf"), add the backend path
+      let url = activeMaterial.file_materi || "";
       if (!url.startsWith('http') && !url.startsWith('/')) {
          url = `${apiUrl}/materi_uploaded/${url}`;
       } else if (url.startsWith('/')) {
          url = `${apiUrl}${url}`;
       }
-      
-      // Open the clean URL directly in a new tab
       window.open(url, '_blank');
 
-    // --- 3. Handle VIDEO ---
     } else {
-      window.open(activeMaterial.video_materi || '', '_blank');
+      // Video
+      const videoUrl = activeMaterial.video_materi || "";
+      window.open(videoUrl, '_blank');
     }
   };
 
   const handleDownload = async () => {
     if (!activeMaterial) return;
 
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
     // --- 1. Handle TEXT (Convert to Word .doc) ---
     if (activeMaterial.jenis_materi === 'text') {
+      
+      // --- FIX: Pre-process Markdown images for Word ---
+      const rawContent = activeMaterial.text_materi || "";
+      const contentWithFixedImages = rawContent.replace(
+        /!\[([^\]]*)\]\(([^)]+)\)/g,
+        (match, alt, src) => {
+          if (src.startsWith('http')) return match;
+          const cleanSrc = src.replace(/^\//, '');
+          const fullUrl = `${apiUrl}/materi_uploaded/${cleanSrc}`;
+          return `![${alt}](${fullUrl})`;
+        }
+      );
+
       const converter = new showdown.Converter();
-      const htmlContent = converter.makeHtml(activeMaterial.text_materi || '');
+      const htmlContent = converter.makeHtml(contentWithFixedImages);
+
       const documentContent = `
         <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
         <head><meta charset='utf-8'><title>${activeMaterial.judul_materi}</title></head>
-        <body><h1>${activeMaterial.judul_materi}</h1>${htmlContent}</body>
+        <body>
+          <h1>${activeMaterial.judul_materi}</h1>
+          ${htmlContent}
+        </body>
         </html>
       `;
+
       const blob = new Blob([documentContent], { type: 'application/msword' });
       const url = URL.createObjectURL(blob);
+      
       const element = document.createElement("a");
       element.href = url;
       element.download = `${activeMaterial.judul_materi.replace(/\s+/g, '_')}.doc`;
+      
       document.body.appendChild(element);
       element.click();
       document.body.removeChild(element);
       URL.revokeObjectURL(url);
       
-    // --- 2. Handle PDF (Fetch and Download) ---
     } else if (activeMaterial.jenis_materi === 'pdf') {
-      let url = activeMaterial.file_materi || '';
-      
-      // FIX: Ensure the URL points to the /materi_uploaded/ folder on backend
+      // --- 2. Handle PDF Download ---
+      let url = activeMaterial.file_materi || "";
       if (!url.startsWith('http') && !url.startsWith('/')) {
          url = `${apiUrl}/materi_uploaded/${url}`;
       } else if (url.startsWith('/')) {
@@ -330,35 +387,24 @@ const MateriPage: React.FC = () => {
       
       try {
         const response = await fetch(url);
-        
-        if (!response.ok) {
-          throw new Error('File tidak ditemukan');
-        }
-        
         const blob = await response.blob();
         const blobUrl = window.URL.createObjectURL(blob);
-        
         const link = document.createElement('a');
         link.href = blobUrl;
-        // Rename the file to the Material Title for better UX
         link.download = `${activeMaterial.judul_materi.replace(/\s+/g, '_')}.pdf`;
-        
         document.body.appendChild(link);
         link.click();
-        
-        // Cleanup untuk mencegah memory leak
-        setTimeout(() => {
-          document.body.removeChild(link);
-          window.URL.revokeObjectURL(blobUrl);
-        }, 100);
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(blobUrl);
       } catch (error) {
         console.error("Download failed:", error);
-        alert("Gagal mengunduh file. Silakan coba lagi.");
+        window.open(url, '_blank');
       }
 
-    // --- 3. Handle VIDEO (YouTube) ---
     } else {
-      navigator.clipboard.writeText(activeMaterial.video_materi || '')
+      // --- 3. Handle Video Download (Link Copy) ---
+      const videoUrl = activeMaterial.video_materi || "";
+      navigator.clipboard.writeText(videoUrl)
         .then(() => alert("Link YouTube berhasil disalin!"))
         .catch(() => console.log("Clipboard failed"));
       window.open("https://y2mate.nu/ysM1/", "_blank");
@@ -373,7 +419,6 @@ const MateriPage: React.FC = () => {
     if (showPrevious) handleNavigate(materials[currentIndex - 1].id_materi);
   };
 
-  // --- Loading Screen ---
   if (isLoading) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-white z-50">
@@ -382,7 +427,6 @@ const MateriPage: React.FC = () => {
     );
   }
 
-  // --- Error Screen ---
   if (error) {
     return (
       <div className="min-h-screen w-screen bg-gray-100 flex flex-col font-sans">
@@ -407,21 +451,16 @@ const MateriPage: React.FC = () => {
     );
   }
 
-  // --- Render ---
-  if (isLoading) return <div className="fixed inset-0 flex items-center justify-center bg-white z-50"><ClipLoader size={50} color={"#1e40af"} /></div>;
-  
-  if (error) return <div className="min-h-screen flex items-center justify-center text-red-600">{error}</div>;
-
   return (
-    <LayoutForm screenName={topicData?.nama_topik || "Materi Pembelajaran"}>
+    <LayoutForm 
+      screenName={topicData?.nama_topik || "Materi Pembelajaran"}
+      backUrl="/topic" 
+    >
 
-      {/* --- TOPIC INFO SECTION (Attached to top bar) --- */}
       <div className="bg-white px-6 py-6 shadow-sm">
         <h2 className="text-xl font-bold text-gray-900">
           {topicData?.nama_topik || "Loading..."} 
         </h2>
-        
-        {/* Change this to use activeMaterial data */}
         <h3 className="text-lg font-bold text-gray-800 mt-1">
           {activeMaterial?.judul_materi || ""}
         </h3>
@@ -433,10 +472,7 @@ const MateriPage: React.FC = () => {
       <div className="flex flex-col md:flex-row w-screen min-h-screen">
         <div className="flex flex-col md:flex-row w-screen min-h-screen gap-8 ml-10 mr-10 mt-10 mb-10">
             
-          {/* --- LEFT SIDEBAR (Navigation List) --- */}
           <div className="w-full lg:w-72 flex-shrink-0 flex flex-col gap-2">
-            
-            {/* Top Arrow (Scrolls Up) */}
             <div 
               onClick={handleScrollUp}
               className="bg-blue-800 text-white py-2 text-center rounded-t-xl text-xs font-bold cursor-pointer hover:bg-blue-700 shadow-sm transition-colors select-none"
@@ -444,12 +480,10 @@ const MateriPage: React.FC = () => {
               ^
             </div>
 
-            {/* List Container (Scrollable) */}
             <div 
-              ref={sidebarRef} // <--- Attach Ref Here
+              ref={sidebarRef} 
               className="flex flex-col gap-2 overflow-y-auto max-h-[500px] lg:max-h-[calc(100vh-300px)] pr-1 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent"
             >
-              {/* Map ALL materials (No slice) */}
               {materials.map((material, index) => {
                 const isActive = activeMaterial?.id_materi === material.id_materi;
                 return (
@@ -473,7 +507,6 @@ const MateriPage: React.FC = () => {
               })}
             </div>
 
-            {/* Bottom Arrow (Scrolls Down) */}
             <div 
               onClick={handleScrollDown}
               className="bg-blue-800 text-white py-2 text-center rounded-b-xl text-xs font-bold cursor-pointer hover:bg-blue-700 shadow-sm transition-colors select-none"
@@ -482,24 +515,17 @@ const MateriPage: React.FC = () => {
             </div>
           </div>
 
-          {/* --- RIGHT CONTENT AREA --- */}
           <div className="w-full lg:flex-1 flex flex-col gap-4">
-            
-            {/* Toolbar (Actions Only) */}
-            {/* 1. self-end: Pushes box to the right */}
-            {/* 2. w-fit: Shrinks box width to fit content (instead of full width) */}
-            {/* 3. p-2: Reduced padding to make it "smaller" */}
             <div className="self-end w-fit flex flex-row items-center gap-3 bg-white p-2 rounded-lg shadow-sm">
-              
               <div className="flex gap-3 w-full sm:w-auto">
                 <button 
-                  onClick={handleDownload} // <--- ADD THIS
+                  onClick={handleDownload}
                   className="flex-1 sm:flex-none bg-blue-700 text-white px-5 py-2 rounded-md font-semibold hover:bg-blue-800 transition-colors flex items-center gap-2 text-sm shadow-sm"
                 >
                   <FaDownload /> <span className="hidden sm:inline">Unduh</span>
                 </button>
               <button 
-                  onClick={handleOpenNewTab} // <--- ADD THIS
+                  onClick={handleOpenNewTab}
                   className="flex-1 sm:flex-none bg-white text-blue-800 border border-blue-800 px-4 py-2 rounded-md text-sm font-bold hover:bg-blue-50 transition-colors flex items-center justify-center gap-2 shadow-sm"
               >
                   <FaExternalLinkAlt /> <span className="hidden sm:inline">Buka Di Tab Baru</span>
@@ -507,7 +533,6 @@ const MateriPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Content Display */}
             <div className="min-h-[500px] bg-white rounded-lg shadow-sm p-6">
               {activeMaterial ? (
                 <>
@@ -522,10 +547,7 @@ const MateriPage: React.FC = () => {
               )}
             </div>
 
-            {/* Footer Navigation Buttons */}
             <div className="flex justify-end items-center pt-4 gap-3">
-              
-              {/* SEBELUMNYA (Only show if not first) */}
               {showPrevious && (
                 <button 
                   onClick={handlePrev} 
@@ -535,7 +557,6 @@ const MateriPage: React.FC = () => {
                 </button>
               )}
 
-              {/* BERIKUTNYA (Only show if not last) */}
               {showNext && (
                 <button 
                   onClick={handleNext} 
@@ -544,7 +565,6 @@ const MateriPage: React.FC = () => {
                   Berikutnya
                 </button>
               )}
-              
             </div>
 
           </div>
