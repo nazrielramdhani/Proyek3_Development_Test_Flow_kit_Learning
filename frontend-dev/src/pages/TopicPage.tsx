@@ -112,7 +112,7 @@ const TopicPage: React.FC = () => {
 
 // Filter materials based on search term
   // FIX: We use (material.nama || "") to turn NULL into "" so it doesn't crash
-  const filteredMaterials = materials.filter((material) => {
+  const filteredMaterials = materials?.filter((material) => {
     const nama = material.nama || "";
     const deskripsi = material.deskripsi || "";
     const term = searchTerm.toLowerCase();
@@ -156,7 +156,7 @@ const TopicPage: React.FC = () => {
           <div className="max-w-full mx-auto">
 
 {/* --- MODIFICATION START: Simple If/Else --- */}
-            {filteredMaterials.length > 0 ? (
+            {filteredMaterials?.length > 0 ? (
               <>
                 {/* 1. Header Row (Only shows if data exists) */}
                 <div className="flex text-xl px-4 font-bold text-blue-800 mb-4">
