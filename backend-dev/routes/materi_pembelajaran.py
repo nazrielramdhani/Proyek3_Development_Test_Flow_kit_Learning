@@ -56,14 +56,25 @@ def create_materi(
 
 
 # ============================================================
-# READ — Mengambil seluruh data materi pembelajaran
+# READ — Mengambil seluruh data materi dengan pagination
 # ============================================================
 @router.get("/materi", response_model=list[MateriOut])
-def list_all_materi():
-    # Select semua kolom dari tabel ms_materi
-    q = select(MateriPembelajaran)
+def list_all_materi(
+    page: int = Query(1, ge=1, description="Halaman data yang ingin diambil"),
+    limit: int = Query(8, ge=1, le=100, description="Jumlah data per halaman")
+):
+    # Hitung offset
+    offset = (page - 1) * limit
+
+    # Query SELECT + LIMIT + OFFSET
+    q = (
+        select(MateriPembelajaran)
+        .limit(limit)
+        .offset(offset)
+    )
+
     rows = conn.execute(q).mappings().all()
-    # Return list of dict agar frontend menerima JSON murni
+
     return [dict(r) for r in rows]
 
 
