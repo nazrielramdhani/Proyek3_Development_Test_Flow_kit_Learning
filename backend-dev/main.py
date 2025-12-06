@@ -73,10 +73,21 @@ app.include_router(materi_pembelajaran)
 app = cors_headers(app)
 
 # --- Static dir ---
+# Pastikan folder materi_uploaded dan subfolder ada juga (pdf/img)
 if not os.path.exists("static"):
     os.makedirs("static")
 
+# create materi_uploaded folders if not exists (safer)
+if not os.path.exists("materi_uploaded"):
+    os.makedirs("materi_uploaded")
+if not os.path.exists(os.path.join("materi_uploaded", "pdf")):
+    os.makedirs(os.path.join("materi_uploaded", "pdf"))
+if not os.path.exists(os.path.join("materi_uploaded", "img")):
+    os.makedirs(os.path.join("materi_uploaded", "img"))
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
+# mount materi_uploaded so uploaded images & pdf can be served directly
+app.mount("/materi_uploaded", StaticFiles(directory="materi_uploaded"), name="materi_uploaded")
 
 
 @app.get("/")
