@@ -289,7 +289,6 @@ const AddMateriForm: React.FC<AddMateriFormProps> = ({ onAddMateri, onCancel, in
                 <FormField
                   control={form.control}
                   name="deskripsi"
-                  rules={{ required: "Deskripsi harus diisi!" }}
                   render={({ field, fieldState: { error } }) => (
                     <FormItem>
                       <FormLabel>Deskripsi Singkat</FormLabel>
