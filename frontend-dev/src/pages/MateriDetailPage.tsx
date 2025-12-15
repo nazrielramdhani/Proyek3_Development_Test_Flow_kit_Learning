@@ -115,17 +115,10 @@ const MateriDetailPage = () => {
     navigate("/learning-materi");
   };
 
-  // NOTE: handleAddMateri sekarang menerima 3rd param articleImages for backward compatibility,
-  // but editor images are uploaded immediately via /materi/upload-image and inserted as URLs into text_materi.
-  const handleAddMateri = async (
-    data: any,
-    file: File | null,
-    articleImages?: File[]
-  ) => {
+  const handleAddMateri = async (data: any, file: File | null) => {
     setIsLoading(true);
     console.log("Data Form:", data);
     console.log("File Upload:", file);
-    console.log("Article images (legacy):", articleImages);
 
     try {
       // Siapkan FormData sesuai field backend
@@ -148,11 +141,6 @@ const MateriDetailPage = () => {
         formData.append("video_materi", data.youtubeUrl || "");
       } else if (jenisLower === "teks" || jenisLower === "text") {
         formData.append("text_materi", data.isiArtikel || "");
-        if (articleImages && articleImages.length > 0) {
-          articleImages.forEach((img) =>
-            formData.append("article_images", img)
-          );
-        }
       }
 
       // Tentukan URL & method: tambah vs edit

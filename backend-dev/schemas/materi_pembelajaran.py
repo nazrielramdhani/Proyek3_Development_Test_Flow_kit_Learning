@@ -28,7 +28,4 @@ class MateriOut(BaseModel):
     file_materi: Optional[str]
     text_materi: Optional[str]
     video_materi: Optional[str]
-    jenis_materi: Optional[str]
-
-class Config:
-    orm_mode = True
+    jenis_materi: Optional[str] 

@@ -1,4 +1,3 @@
-// src/components/custom/LearningTopicTable.tsx
 import React from 'react';
 import { FaEdit, FaTrash, FaCloudUploadAlt, FaCloudDownloadAlt, FaSortUp, FaSortDown } from 'react-icons/fa';
 
@@ -45,16 +44,16 @@ const LearningTopicTable: React.FC<Props> = ({ topics, orderBy, order, onSort, o
           >
             <div className="flex items-center">
               Status Tayang
+              {orderBy === 'status' ? (order === 'asc' ? <FaSortUp className="ml-2 text-white" /> : <FaSortDown className="ml-2 text-white" />) : <FaSortDown className="ml-2 text-white opacity-50" />}
             </div>
           </th>
-          <th className="py-3 px-6 text-left border-b border-r cursor-pointer" onClick={() => onSort('jml_mahasiswa')}>
+          <th
+            className="py-3 px-6 text-left border-b border-r cursor-pointer"
+            onClick={() => onSort('jml_mahasiswa')}
+          >
             <div className="flex items-center">
               Jumlah Mahasiswa Mengakses
-              {orderBy === 'jml_mahasiswa' ? (
-                order === 'asc' ? <FaSortUp className="ml-2 text-white" /> : <FaSortDown className="ml-2 text-white" />
-              ) : (
-                <FaSortDown className="ml-2 text-white opacity-50" />
-              )}
+              {orderBy === 'jml_mahasiswa' ? (order === 'asc' ? <FaSortUp className="ml-2 text-white" /> : <FaSortDown className="ml-2 text-white" />) : <FaSortDown className="ml-2 text-white opacity-50" />}
             </div>
           </th>
           <th className="py-3 px-6 text-left border-b">Action</th>

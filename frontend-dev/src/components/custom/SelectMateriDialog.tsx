@@ -1,7 +1,9 @@
 // ---------------------------------------------------
 // SelectMateriDialog.tsx
+// Dialog untuk memilih materi (search + select all)
 // ---------------------------------------------------
 
+// --- IMPORTS ---
 import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -17,6 +19,7 @@ interface Materi {
   type: string;
 }
 
+// --- PROPS COMPONENT ---
 interface SelectMateriDialogProps {
   isDialogOpen: boolean;
   setIsDialogOpen: (open: boolean) => void;
@@ -25,6 +28,9 @@ interface SelectMateriDialogProps {
   topicName: string;
 }
 
+// -----------------------------------------------------------
+//           COMPONENT UTAMA: SelectMateriDialog
+// -----------------------------------------------------------    
 const SelectMateriDialog: React.FC<SelectMateriDialogProps> = ({
   isDialogOpen,
   setIsDialogOpen,
@@ -33,78 +39,59 @@ const SelectMateriDialog: React.FC<SelectMateriDialogProps> = ({
   topicName,
 }) => {
 
+  // Untuk redirect jika token invalid
   const navigate = useNavigate();
+
+  // URL API dari .env
   const apiUrl = import.meta.env.VITE_API_URL;
 
-  // Setup API Key
+  // Ambil API key dari session login
   let apiKey = import.meta.env.VITE_API_KEY;
   const sessionData = localStorage.getItem("session");
   if (sessionData) {
-    try {
-      const session = JSON.parse(sessionData);
-      apiKey = session.token;
-    } catch (e) { console.error("Error parsing session data", e); }
+    const session = JSON.parse(sessionData);
+    apiKey = session.token;
   }
 
   // --- STATE ---
-  const [materis, setMateris] = useState<Materi[]>([]);            
-  const [filteredMateri, setFilteredMateri] = useState<Materi[]>([]); 
-  const [search, setSearch] = useState("");                       
-  
-  // State Pagination
+  const [materis, setMateris] = useState<Materi[]>([]);            // Semua materi hasil fetch
+  const [filteredMateri, setFilteredMateri] = useState<Materi[]>([]); // Materi setelah search
+  const [search, setSearch] = useState("");                       // Input kata pencarian
+  const [totalPages, setTotalPages] = useState<number>(1);
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const itemsPerPage = 8; 
-
   const [tempSelectedMateri, setTempSelectedMateri] = useState<Materi[]>(selectedMateri ?? []);
 
-  // =================================================================
-  //     PERHITUNGAN PAGINATION (DIPINDAHKAN KE ATAS)
-  // =================================================================
-  // Kita hitung dulu variable ini di sini supaya bisa dipakai oleh 'handleSelectAll'
-  
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  
-  // 'currentMateri' adalah materi yang HANYA tampil di halaman ini
-  const currentMateri = filteredMateri.slice(indexOfFirstItem, indexOfLastItem);
-  
-  const totalPages = Math.ceil(filteredMateri.length / itemsPerPage);
+  const itemsPerPage = 8; // jumlah data per halaman
 
-  // =================================================================
-
-  // Reset pilihan saat dialog dibuka
+  // Jika dialog dibuka ulang → reset pilihan sementara
   useEffect(() => {
     setTempSelectedMateri(selectedMateri ?? []);
-  }, [isDialogOpen, selectedMateri]);
-
-  // Fetch data saat dialog dibuka
-  useEffect(() => {
-    if (isDialogOpen) {
-        fetchAllMateri();
-    }
   }, [isDialogOpen]);
 
-  // Reset ke halaman 1 jika search berubah
+  // Fetch materi ketika halaman berubah
   useEffect(() => {
-    setCurrentPage(1);
-  }, [search]);
+    fetchMateri(currentPage);
+  }, [currentPage]);
 
-  // Mapping helper
+  // -----------------------------------------------------------------------------------
+  //                  FUNGSI MAPPING DATA API → STRUKTUR MATERI
+  // Kalo API nya sering beda struktur → di bawah ini buat menyesuaikan secara fleksibel
+  // -----------------------------------------------------------------------------------
   const mapRowsToMateri = (rows: any[]): Materi[] => {
     return (rows || []).map((m: any) => ({
       id: m.id_materi ?? m.ms_id_materi ?? m.id ?? String(Math.random()),
       name: m.judul_materi ?? m.ms_nama_modul ?? m.name ?? "-",
       description: m.deskripsi_materi ?? m.ms_deskripsi_modul ?? m.description ?? "-",
-      type: String(m.jenis_materi ?? m.type ?? "default"),
+      type: m.jenis_materi ?? m.type ?? "default",
     }));
   };
 
-  // --- FETCH ALL DATA ---
-  const fetchAllMateri = async () => {
+  // ---------------------------------------------------------
+  //             FETCH DATA MATERI DARI BACKEND
+  // ---------------------------------------------------------
+  const fetchMateri = async (page: number) => {
     try {
-      if (!apiUrl) return;
-
-      const response = await fetch(`${apiUrl}/materi?limit=100`, { 
+      const response = await fetch(`${apiUrl}/materi?page=${page}&limit=${itemsPerPage}`, {
         method: "GET",
         headers: {
           Accept: "application/json",
@@ -118,110 +105,135 @@ const SelectMateriDialog: React.FC<SelectMateriDialogProps> = ({
       }
 
       const data = await response.json();
-      let rows: any[] = [];
 
-      if (Array.isArray(data)) {
-         rows = data;
-      } else if (data && (Array.isArray(data.data) || Array.isArray(data.rows))) {
-        rows = data.data || data.rows;
+      let rows: any[] = [];
+      let maxPage = 1;
+
+      // API kadang return array, kadang object
+      if (Array.isArray(data)) rows = data;
+      else if (Array.isArray(data.data)) {
+        rows = data.data;
+        maxPage = data.max_page ?? 1;
       }
 
       const mapped = mapRowsToMateri(rows);
+
       setMateris(mapped);
       setFilteredMateri(mapped);
+      setTotalPages(maxPage);
     } catch (error) {
       console.error("Error fetching materi:", error);
     }
   };
 
-  // --- SEARCH ---
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setSearch(val);
-    const lowerVal = val.toLowerCase();
-    const filtered = materis.filter((m) =>
-      (m.name || "").toLowerCase().includes(lowerVal) ||
-      (m.description || "").toLowerCase().includes(lowerVal)
-    );
-    setFilteredMateri(filtered);
-  };
-
-  // --- SELECTION LOGIC ---
+  // Cek apakah materi sudah dipilih
   const isSelected = (id: string) =>
     Array.isArray(tempSelectedMateri) && tempSelectedMateri.some((m) => m.id === id);
 
+  // Toggle centang per item
   const toggleSelection = (id: string) => {
     const obj = materis.find((x) => x.id === id);
     if (!obj) return;
-    if (isSelected(id)) setTempSelectedMateri((prev) => prev.filter((x) => x.id !== id));
+
+    if (isSelected(id))
+      setTempSelectedMateri((prev) => prev.filter((x) => x.id !== id));
     else setTempSelectedMateri((prev) => [...prev, obj]);
   };
 
   // ---------------------------------------------------------
-  //          FITUR SELECT ALL (PER HALAMAN)
+  //             FITUR SEARCH (nama + deskripsi)
+  // ---------------------------------------------------------
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setSearch(val);
+
+    const filtered = materis.filter((m) =>
+      m.name.toLowerCase().includes(val.toLowerCase()) ||
+      m.description.toLowerCase().includes(val.toLowerCase())
+    );
+
+    setFilteredMateri(filtered);
+  };
+
+  // ---------------------------------------------------------
+  //        FITUR SELECT ALL (berdasarkan hasil search)
   // ---------------------------------------------------------
   const handleSelectAll = () => {
-    // Cek hanya data di halaman ini (currentMateri)
-    if (currentMateri.length === 0) return;
+    if (filteredMateri.length === 0) return;
 
-    // Cek apakah semua item DI HALAMAN INI sudah terpilih?
-    const allSelectedOnPage = currentMateri.every((m) => isSelected(m.id));
+    const allSelected = filteredMateri.every((m) => isSelected(m.id));
 
-    if (allSelectedOnPage) {
-      // Jika semua di halaman ini sudah terpilih -> UNCHECK semuanya (hanya yang di halaman ini)
+    if (allSelected) {
       setTempSelectedMateri((prev) =>
-        prev.filter((p) => !currentMateri.some((cm) => cm.id === p.id))
+        prev.filter((p) => !filteredMateri.some((fm) => fm.id === p.id))
       );
     } else {
-      // Jika belum semua terpilih -> CHECK yang belum terpilih (hanya di halaman ini)
       const newSelected = [...tempSelectedMateri];
-      currentMateri.forEach((m) => {
-        // Hanya masukkan jika belum ada di daftar terpilih
-        if (!isSelected(m.id)) {
-            newSelected.push(m);
-        }
+      filteredMateri.forEach((m) => {
+        if (!isSelected(m.id)) newSelected.push(m);
       });
       setTempSelectedMateri(newSelected);
     }
   };
 
-  // --- UI HELPERS ---
-  const typeColor = (type: any) => {
-    const safeType = String(type || "").toLowerCase();
-    switch (safeType) {
-      case "teks": case "text": return "bg-blue-100 text-blue-700";
-      case "pdf": case "dokumen pdf": case "dokumen": return "bg-green-100 text-green-700";
-      case "video": return "bg-purple-100 text-purple-700";
-      default: return "bg-gray-200 text-gray-700";
+  // ----------------------------------------------------------
+  //            WARNA BADGE BERDASARKAN TIPE MATERI
+  // ----------------------------------------------------------
+  const typeColor = (type: string) => {
+    switch (type?.toLowerCase()) {
+      case "teks":
+      case "text":
+        return "bg-blue-100 text-blue-700";
+      case "pdf":
+      case "dokumen pdf":
+      case "dokumen":
+        return "bg-green-100 text-green-700";
+      case "video":
+        return "bg-purple-100 text-purple-700";
+      default:
+        return "bg-gray-200 text-gray-700";
     }
   };
 
+  // Batal → kembali ke data awal
+  const handleCancel = () => {
+    setTempSelectedMateri(selectedMateri);
+    setIsDialogOpen(false);
+  };
+
+  // Tambahkan materi ke parent (pastikan tidak duplikat)
   const handleAdd = () => {
     const unique = Array.from(new Map(tempSelectedMateri.map((x) => [x.id, x])).values());
     onAddMateri(unique);
     setIsDialogOpen(false);
   };
 
+  // ----------------------------------------------------------
+  //                        RENDER UTAMA
+  // ----------------------------------------------------------
   return (
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
       <DialogContent className="bg-white p-8 md:p-12 rounded-xl shadow-lg max-w-5xl mx-auto max-h-screen overflow-y-auto">
 
+        {/* HEADER */}
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-center mb-6">
             Tambahkan Materi Pada Topik
           </DialogTitle>
         </DialogHeader>
 
-        {/* SEARCH BAR */}
+        {/* SEARCH + SELECT ALL */}
         <div className="flex justify-between items-center mb-5 flex-wrap gap-3">
+
+          {/* BUTTON PILIH SEMUA */}
           <Button
             onClick={handleSelectAll}
             className="bg-white text-blue-800 border border-blue-800 rounded-full px-5 py-2 hover:bg-blue-100 hover:text-blue-800"
           >
-            {/* Ubah teks agar user paham ini per halaman (Opsional) */}
             Pilih Semua
           </Button>
 
+          {/* SEARCH BAR */}
           <div className="relative w-full md:w-72">
             <FaSearch className="absolute left-3 top-3 text-gray-400" />
             <input
@@ -233,16 +245,16 @@ const SelectMateriDialog: React.FC<SelectMateriDialogProps> = ({
           </div>
         </div>
 
-        {/* TABLE */}
+        {/* TABLE LIST MATERI */}
         <div className="overflow-x-auto text-sm">
           <table className="min-w-full bg-white border rounded-lg shadow-md">
             <thead>
               <tr className="bg-blue-800 text-white">
-                <th className="py-2 px-3 border w-[5%]">No</th>
-                <th className="py-2 px-3 border w-[5%]">Select</th>
-                <th className="py-2 px-3 border w-[25%]">Nama Materi</th>
-                <th className="py-2 px-3 border w-[45%]">Deskripsi</th>
-                <th className="py-2 px-3 border w-[20%]">Jenis Materi</th>
+                <th className="py-2 px-3 border">No</th>
+                <th className="py-2 px-3 border">Select</th>
+                <th className="py-2 px-3 border">Nama Materi</th>
+                <th className="py-2 px-3 border">Deskripsi</th>
+                <th className="py-2 px-3 border">Jenis Materi</th>
               </tr>
             </thead>
 
@@ -254,13 +266,13 @@ const SelectMateriDialog: React.FC<SelectMateriDialogProps> = ({
                   </td>
                 </tr>
               ) : (
-                currentMateri.map((mat, i) => (
+                filteredMateri.map((mat, i) => (
                   <tr
                     key={mat.id}
                     className={`${i % 2 === 0 ? "bg-blue-50" : "bg-white"} text-center`}
                   >
                     <td className="py-2 px-3 border">
-                      {indexOfFirstItem + i + 1}
+                      {(currentPage - 1) * itemsPerPage + i + 1}
                     </td>
 
                     <td className="py-2 px-3 border">
@@ -274,8 +286,8 @@ const SelectMateriDialog: React.FC<SelectMateriDialogProps> = ({
                     <td className="py-2 px-3 border text-left">{mat.name}</td>
                     <td className="py-2 px-3 border text-left">{mat.description}</td>
 
-                    <td className="py-2 px-3 border text-center align-middle">
-                      <span className={`inline-block min-w-[100px] px-3 py-1 rounded-md text-xs font-semibold text-center ${typeColor(mat.type)}`}>
+                    <td className="py-2 px-3 border text-center">
+                      <span className={`px-3 py-1 rounded-md text-xs font-semibold ${typeColor(mat.type)}`}>
                         {mat.type}
                       </span>
                     </td>
@@ -288,21 +300,15 @@ const SelectMateriDialog: React.FC<SelectMateriDialogProps> = ({
 
         {/* PAGINATION */}
         <div className="flex justify-center mt-3">
-          <Pagination 
-            currentPage={currentPage} 
-            totalPages={totalPages > 0 ? totalPages : 1} 
-            onPageChange={setCurrentPage} 
-          />
+          <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
         </div>
 
-        {/* FOOTER */}
+        {/* FOOTER BUTTONS */}
         <div className="flex justify-end gap-4 mt-6">
+
           <Button
             className="bg-white text-blue-800 border border-blue-800 rounded-full px-5 py-2 hover:bg-blue-100 hover:text-blue-800"
-            onClick={() => {
-                setTempSelectedMateri(selectedMateri ?? []);
-                setIsDialogOpen(false);
-            }}
+            onClick={handleCancel}
           >
             Kembali
           </Button>
