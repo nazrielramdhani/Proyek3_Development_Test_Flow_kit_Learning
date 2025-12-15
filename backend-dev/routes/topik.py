@@ -510,7 +510,7 @@ async def mappingTopikModul(request: Request, id_topik: str, response: Response)
     
     return {"message": "sukses mengambil data ", "data": data_moduls}
 
-@topik.post("/topik/{id_topik}/track-access", dependencies=[Depends(JWTBearer())], tags=["Topik Pembelajaran"]) 
+@topik.post("/api/topik/{id_topik}/track-access", dependencies=[Depends(JWTBearer())], tags=["Topik Pembelajaran"]) 
 async def track_student_access(request: Request, id_topik: str, response: Response):
     """
     Endpoint untuk mencatat akses mahasiswa ke topik pembelajaran.
@@ -520,7 +520,22 @@ async def track_student_access(request: Request, id_topik: str, response: Respon
         currentUser = getDataFromJwt(request)
         student_id = currentUser['userid']
         
-        print(f"[DEBUG] Tracking access - Student ID: {student_id}, Topic ID: {id_topik}")
+        print(f"[DEBUG] ========== TRACKING ACCESS ==========")
+        print(f"[DEBUG] Student ID: {student_id}")
+        print(f"[DEBUG] Topic ID: {id_topik}")
+        
+        # Cek apakah topik ada di tabel ms_topik
+        topik_check = text("""
+            SELECT id_topik, nama_topik FROM ms_topik WHERE id_topik = :id_topik
+        """)
+        topik_exists = conn.execute(topik_check, id_topik=id_topik).fetchone()
+        
+        if not topik_exists:
+            print(f"[ERROR] Topik dengan ID {id_topik} tidak ditemukan di tabel ms_topik")
+            response.status_code = status.HTTP_404_NOT_FOUND
+            return {"message": f"Topik dengan ID {id_topik} tidak ditemukan"}
+        
+        print(f"[DEBUG] Topik ditemukan: {topik_exists.nama_topik}")
         
         # Cek apakah mahasiswa sudah pernah mengakses topik ini
         check_query = text("""
@@ -567,7 +582,9 @@ async def track_student_access(request: Request, id_topik: str, response: Respon
         except Exception as e:
             # Rollback jika ada error
             trans.rollback()
-            print(f"[DEBUG] Error during transaction: {e}")
+            print(f"[ERROR] Error during transaction: {e}")
+            import traceback
+            traceback.print_exc()
             raise
         
         # Ambil jumlah mahasiswa terbaru
@@ -576,6 +593,9 @@ async def track_student_access(request: Request, id_topik: str, response: Respon
         """)
         result = conn.execute(count_query, id_topik=id_topik).fetchone()
         
+        print(f"[DEBUG] Updated jml_mahasiswa: {result.jml_mahasiswa if result else 0}")
+        print(f"[DEBUG] ========== TRACKING SUCCESS ==========")
+        
         return {
             "message": "Akses berhasil dicatat",
             "is_new_access": True,
@@ -583,11 +603,14 @@ async def track_student_access(request: Request, id_topik: str, response: Respon
         }
         
     except Exception as e:
+        print(f"[ERROR] ========== TRACKING FAILED ==========")
         print(f"[ERROR] Failed to track access: {str(e)}")
+        import traceback
+        traceback.print_exc()
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
         return {"message": f"Error: {str(e)}"}
 
-@topik.get("/topik/{id_topik}/stats", dependencies=[Depends(JWTBearer())], tags=["Topik Pembelajaran"])
+@topik.get("/api/topik/{id_topik}/stats", dependencies=[Depends(JWTBearer())], tags=["Topik Pembelajaran"])
 async def get_topik_stats(id_topik: str, response: Response):
     """
     Endpoint untuk mendapatkan statistik topik (jumlah mahasiswa yang mengakses).
