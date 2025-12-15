@@ -65,11 +65,11 @@ const TopicPage: React.FC = () => {
   const handleTrackAccess = async (topicId: string, firstMateriId: string) => {
     try {
       console.log('[DEBUG] Tracking access for topic:', topicId);
-      console.log('[DEBUG] API URL:', `${apiUrl}/api/topik/${topicId}/track-access`);
+      console.log('[DEBUG] API URL:', `${apiUrl}/topik/${topicId}/track-access`);
       console.log('[DEBUG] Token:', apiKey ? 'Token exists' : 'No token');
       
       // Call API to track access
-      const response = await fetch(`${apiUrl}/api/topik/${topicId}/track-access`, {
+      const response = await fetch(`${apiUrl}/topik/${topicId}/track-access`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
