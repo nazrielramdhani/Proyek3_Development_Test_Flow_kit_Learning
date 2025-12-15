@@ -115,20 +115,25 @@ def takedown_topik(id_topik: str = Query(...)):
 @router.get("/topik-pembelajaran/{id_topik}/materi")
 def list_materi_for_topik(id_topik: str):
     sql = text("""
-        SELECT 
-            m.*,
+        SELECT
+            m.id_materi,
+            m.judul_materi,
+            m.deskripsi_materi,
+            m.jenis_materi,
+            m.file_materi,
+            m.text_materi,
+            m.video_materi,
             tm.nomor_urutan
         FROM ms_materi m
         JOIN topik_materi tm ON tm.id_materi = m.id_materi
         WHERE tm.id_topik = :id
-        ORDER BY COALESCE(tm.nomor_urutan, 0) ASC, tm.created_at ASC
+        ORDER BY tm.nomor_urutan ASC, tm.created_at ASC
     """)
 
     with engine.connect() as conn:
         rows = conn.execute(sql, {"id": id_topik}).mappings().all()
 
     return {"data": [dict(r) for r in rows]}
-
 
 # ============================================================
 # TAMBAHKAN MATERI KE DALAM TOPIK

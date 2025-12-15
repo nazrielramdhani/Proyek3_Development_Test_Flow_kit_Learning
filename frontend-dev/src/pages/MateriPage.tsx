@@ -129,7 +129,7 @@ const MateriPage: React.FC = () => {
       
       try {
         // Fetch topic info
-        const topicRes = await fetch(`${apiUrl}/api/topik-pembelajaran`, {
+        const topicRes = await fetch(`${apiUrl}/topik_pembelajaran`, {
           headers: { 
             Authorization: `Bearer ${session.token}`,
             'Content-Type': 'application/json'
@@ -148,12 +148,15 @@ const MateriPage: React.FC = () => {
         }
 
         // Fetch materials
-        const res = await fetch(`${apiUrl}/api/topik/${topicId}/materials`, {
-          headers: { 
-            Authorization: `Bearer ${session.token}`,
-            'Content-Type': 'application/json'
-          },
-        });
+        const res = await fetch(
+          `${apiUrl}/topik-pembelajaran/${topicId}/materi`,
+          {
+            headers: {
+              Authorization: `Bearer ${session.token}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
         
         if (!res.ok) {
           throw new Error(`HTTP error! status: ${res.status}`);
@@ -165,12 +168,12 @@ const MateriPage: React.FC = () => {
           throw new Error(data.error);
         }
         
-        if (data.materials && Array.isArray(data.materials) && data.materials.length > 0) {
-          setMaterials(data.materials);
-        } else {
-          setMaterials([]);
-          setError("Tidak ada materi yang tersedia untuk topik ini.");
-        }
+      if (data.data && Array.isArray(data.data)) {
+        setMaterials(data.data);
+      } else {
+        setMaterials([]);
+        setError("Tidak ada materi yang tersedia untuk topik ini.");
+      }
       } catch (error) {
         console.error("Failed to load materials:", error);
         setMaterials([]);

@@ -36,8 +36,7 @@ const TopicPage: React.FC = () => {
         navigate("/dashboard-teacher");
       } else {
         // --- THIS IS THE NEW PART ---
-        // Fetch data from the endpoint in main.py
-        fetch(`${apiUrl}/api/topik-pembelajaran`, {
+        fetch(`${apiUrl}/topik_pembelajaran`, {
           headers: { Authorization: `Bearer ${apiKey}` },
         })
           .then((res) => res.json())
