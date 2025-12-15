@@ -229,9 +229,10 @@ const MateriPage: React.FC = () => {
   };
 
   const getContentFromMaterial = (material: MaterialData): string => {
-    if (material.jenis_materi === 'pdf') return material.file_materi || '';
-    if (material.jenis_materi === 'text') return material.text_materi || '';
-    if (material.jenis_materi === 'video') return material.video_materi || '';
+    const jenis = (material.jenis_materi || '').toLowerCase();
+    if (jenis === 'pdf' || jenis.includes('dokumen')) return material.file_materi || '';
+    if (jenis === 'text' || jenis === 'teks') return material.text_materi || '';
+    if (jenis === 'video') return material.video_materi || '';
     return '';
   };
 
@@ -253,8 +254,9 @@ const MateriPage: React.FC = () => {
     if (!activeMaterial) return;
 
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    const jenis = (activeMaterial.jenis_materi || '').toLowerCase();
 
-    if (activeMaterial.jenis_materi === 'text') {
+    if (jenis === 'text' || jenis === 'teks') {
       // --- FIX: Pre-process Markdown to add Backend URL to images ---
       // This finds ![Alt](filename.png) and turns it into ![Alt](http://.../filename.png)
       const rawContent = activeMaterial.text_materi || "";
@@ -318,7 +320,7 @@ const MateriPage: React.FC = () => {
       const url = URL.createObjectURL(blob);
       window.open(url, '_blank');
 
-    } else if (activeMaterial.jenis_materi === 'pdf') {
+    } else if (jenis === 'pdf' || jenis.includes('dokumen')) {
       let url = activeMaterial.file_materi || "";
       if (!url.startsWith('http') && !url.startsWith('/')) {
          url = `${apiUrl}/materi_uploaded/${url}`;
@@ -338,9 +340,10 @@ const MateriPage: React.FC = () => {
     if (!activeMaterial) return;
 
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    const jenis = (activeMaterial.jenis_materi || '').toLowerCase();
 
     // --- 1. Handle TEXT (Convert to Word .doc) ---
-    if (activeMaterial.jenis_materi === 'text') {
+    if (jenis === 'text' || jenis === 'teks') {
       
       // --- FIX: Pre-process Markdown images for Word ---
       const rawContent = activeMaterial.text_materi || "";
@@ -379,7 +382,7 @@ const MateriPage: React.FC = () => {
       document.body.removeChild(element);
       URL.revokeObjectURL(url);
       
-    } else if (activeMaterial.jenis_materi === 'pdf') {
+    } else if (jenis === 'pdf' || jenis.includes('dokumen')) {
       // --- 2. Handle PDF Download ---
       let url = activeMaterial.file_materi || "";
       if (!url.startsWith('http') && !url.startsWith('/')) {
@@ -539,9 +542,13 @@ const MateriPage: React.FC = () => {
             <div className="min-h-[500px] bg-white rounded-lg shadow-sm p-6">
               {activeMaterial ? (
                 <>
-                  {activeMaterial.jenis_materi === 'text' && <TextContent content={getContentFromMaterial(activeMaterial)} />}
-                  {activeMaterial.jenis_materi === 'pdf' && <PdfContent content={getContentFromMaterial(activeMaterial)} />}
-                  {activeMaterial.jenis_materi === 'video' && <VideoContent content={getContentFromMaterial(activeMaterial)} />}
+                  {(() => {
+                    const jenis = (activeMaterial.jenis_materi || '').toLowerCase();
+                    if (jenis === 'text' || jenis === 'teks') return <TextContent content={getContentFromMaterial(activeMaterial)} />;
+                    if (jenis === 'pdf' || jenis.includes('dokumen')) return <PdfContent content={getContentFromMaterial(activeMaterial)} />;
+                    if (jenis === 'video') return <VideoContent content={getContentFromMaterial(activeMaterial)} />;
+                    return null;
+                  })()}
                 </>
               ) : (
                 <div className="flex items-center justify-end h-full text-gray-400 p-8">

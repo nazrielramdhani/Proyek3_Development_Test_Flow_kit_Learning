@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Query, Path, UploadFile, File, Form
-from config.database import conn
+from config.database import engine
 from schemas.materi_pembelajaran import MateriCreate, MateriUpdate, MateriOut
 from models.materi_pembelajaran import MateriPembelajaran
 from sqlalchemy import select, text
@@ -50,7 +50,9 @@ def create_materi(
         text_materi=text_materi,
         video_materi=video_materi
     )
-    conn.execute(ins)
+    
+    with engine.begin() as conn:
+        conn.execute(ins)
 
     return {"status": "ok", "id_materi": id_}
 
@@ -62,7 +64,8 @@ def create_materi(
 def list_all_materi():
     # Select semua kolom dari tabel ms_materi
     q = select(MateriPembelajaran)
-    rows = conn.execute(q).mappings().all()
+    with engine.connect() as conn:
+        rows = conn.execute(q).mappings().all()
     # Return list of dict agar frontend menerima JSON murni
     return [dict(r) for r in rows]
 
@@ -74,7 +77,8 @@ def list_all_materi():
 def get_materi(id_materi: str):
     # Query mencari materi berdasarkan ID
     q = select(MateriPembelajaran).where(MateriPembelajaran.c.id_materi == id_materi)
-    r = conn.execute(q).mappings().first()
+    with engine.connect() as conn:
+        r = conn.execute(q).mappings().first()
 
     # Jika tidak ditemukan → error 404
     if not r:
@@ -130,7 +134,8 @@ def update_materi(
         MateriPembelajaran.c.id_materi == id_materi
     ).values(**upd_vals)
 
-    conn.execute(upd)
+    with engine.begin() as conn:
+        conn.execute(upd)
     return {"status": "ok"}
 
 # ============================================================
@@ -147,7 +152,8 @@ def delete_materi(id_materi: str = Path(...)):
     LIMIT 1
     """)
 
-    rows = conn.execute(sql, {"id": id_materi}).first()
+    with engine.connect() as conn:
+        rows = conn.execute(sql, {"id": id_materi}).first()
 
     # Jika ada mahasiswa yang sudah mengakses → tidak boleh hapus
     if rows:
@@ -160,6 +166,8 @@ def delete_materi(id_materi: str = Path(...)):
     delq = MateriPembelajaran.delete().where(
         MateriPembelajaran.c.id_materi == id_materi
     )
-    conn.execute(delq)
+    
+    with engine.begin() as conn:
+        conn.execute(delq)
 
     return {"status": "ok"}
