@@ -30,6 +30,82 @@ const TextContent: React.FC<{ content: string }> = ({ content }) => {
   // 1. Ambil API URL (Sama seperti di komponen lain)
   const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
+  // 2. Deteksi apakah konten adalah HTML atau Markdown
+  const isHTML = content && (content.includes('<p>') || content.includes('<img') || content.includes('<div') || content.includes('<h1') || content.includes('<h2') || content.includes('<ul>') || content.includes('<ol>'));
+
+  // 3. Jika HTML, render menggunakan dangerouslySetInnerHTML
+  if (isHTML) {
+    // Perbaiki URL gambar relatif dalam HTML
+    let processedContent = content;
+    
+    // Fix relative image paths yang belum lengkap
+    processedContent = processedContent.replace(
+      /src="(?!http|data:)([^"]+)"/g,
+      (match, src) => {
+        // Jika path sudah lengkap dengan domain, skip
+        if (src.startsWith('http')) return match;
+        
+        // Jika path sudah benar (sudah ada materi_uploaded), skip
+        if (src.includes('materi_uploaded')) return match;
+        
+        // Jika hanya filename atau path relatif, tambahkan base URL
+        const cleanSrc = src.startsWith('/') ? src.substring(1) : src;
+        return `src="${apiUrl}/materi_uploaded/${cleanSrc}"`;
+      }
+    );
+
+    // Tambahkan styling untuk gambar dalam HTML
+    const styledContent = `
+      <style>
+        .html-content img {
+          max-width: 100%;
+          height: auto;
+          display: block;
+          margin: 1.5rem auto;
+          border-radius: 0.5rem;
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+          border: 1px solid #e5e7eb;
+        }
+        .html-content p {
+          margin-bottom: 1rem;
+          text-align: justify;
+          line-height: 1.8;
+        }
+        .html-content h1 {
+          font-size: 1.5rem;
+          font-weight: bold;
+          margin-top: 1.5rem;
+          margin-bottom: 1rem;
+          color: #1e40af;
+        }
+        .html-content h2 {
+          font-size: 1.25rem;
+          font-weight: bold;
+          margin-top: 1.25rem;
+          margin-bottom: 0.75rem;
+          color: #1f2937;
+        }
+        .html-content ul {
+          list-style: disc;
+          padding-left: 1.5rem;
+          margin-bottom: 1rem;
+        }
+        .html-content li {
+          margin-bottom: 0.25rem;
+        }
+      </style>
+      ${processedContent}
+    `;
+
+    return (
+      <div 
+        className="bg-white p-8 shadow-sm rounded-lg text-gray-800 leading-relaxed min-h-[400px] overflow-auto html-content"
+        dangerouslySetInnerHTML={{ __html: styledContent }}
+      />
+    );
+  }
+
+  // 4. Jika Markdown, render menggunakan ReactMarkdown
   return (
     <div className="bg-white p-8 shadow-sm rounded-lg text-gray-800 leading-relaxed min-h-[400px] overflow-auto">
       <ReactMarkdown
