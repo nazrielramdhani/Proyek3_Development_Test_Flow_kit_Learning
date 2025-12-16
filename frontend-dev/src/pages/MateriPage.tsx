@@ -149,7 +149,14 @@ const TextContent: React.FC<{ content: string }> = ({ content }) => {
 
 const PdfContent: React.FC<{ content: string }> = ({ content }) => {
   const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-  const pdfUrl = `${apiUrl}/materi_uploaded/${content}`;
+  
+  // Backward compatibility: jika path belum ada subfolder "pdf/", tambahkan
+  let pdfPath = content;
+  if (pdfPath && !pdfPath.includes('/')) {
+    pdfPath = `pdf/${pdfPath}`;
+  }
+  
+  const pdfUrl = `${apiUrl}/materi_uploaded/${pdfPath}`;
   
   return (
     <div className="bg-gray-50 rounded-lg shadow-sm">

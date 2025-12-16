@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Path, Request
-from config.database import conn
+from config.database import engine
 from schemas.materi_pembelajaran import MateriOut
 from models.materi_pembelajaran import MateriPembelajaran
 from sqlalchemy import select, text
@@ -88,7 +88,8 @@ def create_materi(
         save_path = os.path.join(PATH_PDF_URL, pdf_name)
         with open(save_path, "wb") as f:
             f.write(file_materi.file.read())
-        file_list.append(pdf_name)
+        # Simpan path relatif lengkap (pdf/xxx.pdf) agar frontend bisa akses
+        file_list.append(f"pdf/{pdf_name}")
 
     # =======================================================
     # 2. Jika ada article_images (legacy) → simpan juga
@@ -100,7 +101,8 @@ def create_materi(
             save_path = os.path.join(PATH_IMG_URL, img_name)
             with open(save_path, "wb") as f:
                 f.write(img.file.read())
-            file_list.append(img_name)
+            # Simpan path relatif lengkap (img/xxx.png) agar frontend bisa akses
+            file_list.append(f"img/{img_name}")
 
     # =======================================================
     # Convert ke string (comma separated)
@@ -116,7 +118,9 @@ def create_materi(
         text_materi=text_materi,
         video_materi=video_materi,
     )
-    conn.execute(ins)
+    
+    with engine.begin() as conn:
+        conn.execute(ins)
 
     return {"status": "ok", "id_materi": id_}
 
@@ -127,7 +131,8 @@ def create_materi(
 @router.get("/materi", response_model=list[MateriOut])
 def list_all_materi():
     q = select(MateriPembelajaran)
-    rows = conn.execute(q).mappings().all()
+    with engine.connect() as conn:
+        rows = conn.execute(q).mappings().all()
     return [dict(r) for r in rows]
 
 
@@ -137,7 +142,8 @@ def list_all_materi():
 @router.get("/materi/{id_materi}", response_model=MateriOut)
 def get_materi(id_materi: str):
     q = select(MateriPembelajaran).where(MateriPembelajaran.c.id_materi == id_materi)
-    r = conn.execute(q).mappings().first()
+    with engine.connect() as conn:
+        r = conn.execute(q).mappings().first()
 
     if not r:
         raise HTTPException(status_code=404, detail="Materi tidak ditemukan")
@@ -177,7 +183,8 @@ def update_materi(
     # Ambil data lama untuk referensi
     # =======================================================
     q = select(MateriPembelajaran).where(MateriPembelajaran.c.id_materi == id_materi)
-    existing = conn.execute(q).mappings().first()
+    with engine.connect() as conn:
+        existing = conn.execute(q).mappings().first()
 
     if not existing:
         raise HTTPException(status_code=404, detail="Materi tidak ditemukan")
@@ -195,7 +202,8 @@ def update_materi(
         save_path = os.path.join(PATH_PDF_URL, pdf_name)
         with open(save_path, "wb") as f:
             f.write(file_materi.file.read())
-        new_file_list = [pdf_name]
+        # Simpan path relatif lengkap (pdf/xxx.pdf) agar frontend bisa akses
+        new_file_list = [f"pdf/{pdf_name}"]
 
     # =======================================================
     # 2. Jika upload gambar baru (legacy append)
@@ -208,7 +216,8 @@ def update_materi(
             save_path = os.path.join(PATH_IMG_URL, new_name)
             with open(save_path, "wb") as f:
                 f.write(img.file.read())
-            new_file_list.append(new_name)
+            # Simpan path relatif lengkap (img/xxx.png) agar frontend bisa akses
+            new_file_list.append(f"img/{new_name}")
 
     upd_vals["file_materi"] = ",".join(new_file_list) if new_file_list else None
 
@@ -217,7 +226,8 @@ def update_materi(
             MateriPembelajaran.c.id_materi == id_materi
         ).values(**upd_vals)
 
-        conn.execute(upd)
+        with engine.begin() as conn:
+            conn.execute(upd)
 
     return {"status": "ok"}
 
@@ -235,7 +245,9 @@ def delete_materi(id_materi: str = Path(...)):
         WHERE tm.id_materi = :id LIMIT 1
     """)
 
-    rows = conn.execute(sql, {"id": id_materi}).first()
+    with engine.connect() as conn:
+        rows = conn.execute(sql, {"id": id_materi}).first()
+    
     if rows:
         raise HTTPException(
             status_code=400,
@@ -246,6 +258,8 @@ def delete_materi(id_materi: str = Path(...)):
     delq = MateriPembelajaran.delete().where(
         MateriPembelajaran.c.id_materi == id_materi
     )
-    conn.execute(delq)
+    
+    with engine.begin() as conn:
+        conn.execute(delq)
 
     return {"status": "ok"}
