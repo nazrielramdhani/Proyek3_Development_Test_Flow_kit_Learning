@@ -43,9 +43,7 @@ const LearningTopicTable: React.FC<Props> = ({ topics, orderBy, order, onSort, o
             onClick={() => onSort('status')}
           >
             <div className="flex items-center">
-              Status Tayang
-              {orderBy === 'status' ? (order === 'asc' ? <FaSortUp className="ml-2 text-white" /> : <FaSortDown className="ml-2 text-white" />) : <FaSortDown className="ml-2 text-white opacity-50" />}
-            </div>
+              Status Tayang</div>
           </th>
           <th
             className="py-3 px-6 text-left border-b border-r cursor-pointer"

@@ -117,7 +117,8 @@ def create_materi(
         text_materi=text_materi,
         video_materi=video_materi,
     )
-    engine.execute(ins)
+    with engine.begin() as conn:
+        conn.execute(ins)
 
     return {
         "status": "ok",
@@ -130,7 +131,8 @@ def create_materi(
 @router.get("/materi", response_model=list[MateriOut], dependencies=[Depends(JWTBearer())])
 def list_all_materi():
     q = select(MateriPembelajaran)
-    rows = engine.execute(q).mappings().all()
+    with engine.connect() as conn:
+        rows = conn.execute(q).mappings().all()
     return [dict(r) for r in rows]
 
 
@@ -140,7 +142,8 @@ def list_all_materi():
 @router.get("/materi/{id_materi}", response_model=MateriOut, dependencies=[Depends(JWTBearer())])
 def get_materi(id_materi: str):
     q = select(MateriPembelajaran).where(MateriPembelajaran.c.id_materi == id_materi)
-    r = engine.execute(q).mappings().first()
+    with engine.connect() as conn:
+        r = conn.execute(q).mappings().first()
 
     if not r:
         raise HTTPException(status_code=404, detail="Materi tidak ditemukan")
@@ -180,7 +183,8 @@ def update_materi(
     # Ambil data lama untuk referensi
     # =======================================================
     q = select(MateriPembelajaran).where(MateriPembelajaran.c.id_materi == id_materi)
-    existing = engine.execute(q).mappings().first()
+    with engine.connect() as conn:
+        existing = conn.execute(q).mappings().first()
 
     if not existing:
         raise HTTPException(status_code=404, detail="Materi tidak ditemukan")
@@ -254,7 +258,8 @@ def update_materi(
             MateriPembelajaran.c.id_materi == id_materi
         ).values(**upd_vals)
 
-        engine.execute(upd)
+        with engine.begin() as conn:
+            conn.execute(upd)
 
     return {"status": "ok"}
 
@@ -272,7 +277,8 @@ def delete_materi(id_materi: str = Path(...)):
         WHERE tm.id_materi = :id LIMIT 1
     """)
 
-    rows = engine.execute(sql, {"id": id_materi}).first()
+    with engine.connect() as conn:
+        rows = conn.execute(sql, {"id": id_materi}).first()
     if rows:
         raise HTTPException(
             status_code=400,
@@ -283,6 +289,7 @@ def delete_materi(id_materi: str = Path(...)):
     delq = MateriPembelajaran.delete().where(
         MateriPembelajaran.c.id_materi == id_materi
     )
-    engine.execute(delq)
+    with engine.begin() as conn:
+        conn.execute(delq)
 
     return {"status": "ok"}
