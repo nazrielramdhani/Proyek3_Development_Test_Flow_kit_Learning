@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Path, Request
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Path, Request, Depends
 from config.database import engine
 from schemas.materi_pembelajaran import MateriOut
+from middleware.auth_bearer import JWTBearer
 from models.materi_pembelajaran import MateriPembelajaran
 from sqlalchemy import select, text
 from decouple import config
@@ -32,7 +33,7 @@ os.makedirs(PATH_IMG_URL, exist_ok=True)
 # UPLOAD IMAGE (dipanggil oleh editor - ReactQuill)
 # Endpoint ini menerima satu gambar dan mengembalikan URL penuh
 # ============================================================
-@router.post("/materi/upload-image")
+@router.post("/materi/upload-image", dependencies=[Depends(JWTBearer())])
 async def upload_materi_image(file: UploadFile = File(...)):
     # Validasi extension sederhana
     allowed_extensions = ("jpg", "jpeg", "png", "gif", "webp")
@@ -58,92 +59,88 @@ async def upload_materi_image(file: UploadFile = File(...)):
 
 
 # ============================================================
-# CREATE — Upload PDF atau image + metadata
-# Note: frontend now will upload images individually via upload-image
-# and insert URLs into text_materi (so create_materi doesn't need article_images)
-# But we keep article_images param for backward compatibility.
+# CREATE — Upload materi (PDF / teks / video)
+# Image TIDAK di-handle di sini
 # ============================================================
-@router.post("/materi")
+@router.post("/materi", dependencies=[Depends(JWTBearer())])
 def create_materi(
     judul_materi: str = Form(...),
     deskripsi_materi: str = Form(None),
-    jenis_materi: str = Form(...),
-    text_materi: str = Form(None),
-    video_materi: str = Form(None),
-    file_materi: UploadFile = File(None),                  # PDF
-    article_images: list[UploadFile] = File(None)          # Multiple images (optional)
+    jenis_materi: str = Form(...),      # dokumen | teks | video
+    text_materi: str = Form(None),      # berisi HTML + image URL
+    video_materi: str = Form(None),     # link youtube
+    file_materi: UploadFile = File(None)  # PDF
 ):
-    id_ = str(uuid.uuid4())
-    file_list = []  # tempat menyimpan file PDF / IMG (legacy support)
+    id_materi = str(uuid.uuid4())
+    pdf_filename = None
 
     # =======================================================
-    # 1. Jika jenis PDF → Simpan PDF
+    # VALIDASI BERDASARKAN JENIS MATERI
     # =======================================================
-    if jenis_materi and jenis_materi.lower().startswith("dokumen"):
+    jenis = jenis_materi.lower()
+
+    # ---- Materi PDF ----
+    if jenis == "dokumen":
         if not file_materi:
-            raise HTTPException(status_code=400, detail="File PDF wajib diunggah.")
+            raise HTTPException(status_code=400, detail="File PDF wajib diunggah")
         if not file_materi.filename.lower().endswith(".pdf"):
-            raise HTTPException(status_code=400, detail="File harus berformat PDF.")
-        pdf_name = f"{id_}.pdf"
-        save_path = os.path.join(PATH_PDF_URL, pdf_name)
+            raise HTTPException(status_code=400, detail="File harus berformat PDF")
+
+        pdf_filename = f"{id_materi}.pdf"
+        save_path = os.path.join(PATH_PDF_URL, pdf_filename)
+
         with open(save_path, "wb") as f:
             f.write(file_materi.file.read())
-        # Simpan path relatif lengkap (pdf/xxx.pdf) agar frontend bisa akses
-        file_list.append(f"pdf/{pdf_name}")
+
+    # ---- Materi Video ----
+    elif jenis == "video":
+        if not video_materi:
+            raise HTTPException(status_code=400, detail="Link video wajib diisi")
+
+    # ---- Materi Teks ----
+    elif jenis == "teks":
+        if not text_materi:
+            raise HTTPException(status_code=400, detail="Konten teks wajib diisi")
+
+    else:
+        raise HTTPException(status_code=400, detail="Jenis materi tidak valid")
 
     # =======================================================
-    # 2. Jika ada article_images (legacy) → simpan juga
+    # SIMPAN KE DATABASE
     # =======================================================
-    if article_images:
-        for idx, img in enumerate(article_images):
-            ext = img.filename.split(".")[-1].lower()
-            img_name = f"{id_}-{idx}.{ext}"
-            save_path = os.path.join(PATH_IMG_URL, img_name)
-            with open(save_path, "wb") as f:
-                f.write(img.file.read())
-            # Simpan path relatif lengkap (img/xxx.png) agar frontend bisa akses
-            file_list.append(f"img/{img_name}")
-
-    # =======================================================
-    # Convert ke string (comma separated)
-    # =======================================================
-    file_materi_value = ",".join(file_list) if file_list else None
-
     ins = MateriPembelajaran.insert().values(
-        id_materi=id_,
+        id_materi=id_materi,
         judul_materi=judul_materi,
         deskripsi_materi=deskripsi_materi,
         jenis_materi=jenis_materi,
-        file_materi=file_materi_value,
+        file_materi=pdf_filename,
         text_materi=text_materi,
         video_materi=video_materi,
     )
-    
-    with engine.begin() as conn:
-        conn.execute(ins)
+    engine.execute(ins)
 
-    return {"status": "ok", "id_materi": id_}
-
+    return {
+        "status": "ok",
+        "id_materi": id_materi
+    }
 
 # ============================================================
 # READ — Semua materi
 # ============================================================
-@router.get("/materi", response_model=list[MateriOut])
+@router.get("/materi", response_model=list[MateriOut], dependencies=[Depends(JWTBearer())])
 def list_all_materi():
     q = select(MateriPembelajaran)
-    with engine.connect() as conn:
-        rows = conn.execute(q).mappings().all()
+    rows = engine.execute(q).mappings().all()
     return [dict(r) for r in rows]
 
 
 # ============================================================
 # READ by ID
 # ============================================================
-@router.get("/materi/{id_materi}", response_model=MateriOut)
+@router.get("/materi/{id_materi}", response_model=MateriOut, dependencies=[Depends(JWTBearer())])
 def get_materi(id_materi: str):
     q = select(MateriPembelajaran).where(MateriPembelajaran.c.id_materi == id_materi)
-    with engine.connect() as conn:
-        r = conn.execute(q).mappings().first()
+    r = engine.execute(q).mappings().first()
 
     if not r:
         raise HTTPException(status_code=404, detail="Materi tidak ditemukan")
@@ -154,7 +151,7 @@ def get_materi(id_materi: str):
 # ============================================================
 # UPDATE — Ubah metadata + bisa upload PDF atau gambar baru (legacy)
 # ============================================================
-@router.put("/materi")
+@router.put("/materi", dependencies=[Depends(JWTBearer())])
 def update_materi(
     id_materi: str = Form(...),
     judul_materi: str = Form(None),
@@ -183,14 +180,47 @@ def update_materi(
     # Ambil data lama untuk referensi
     # =======================================================
     q = select(MateriPembelajaran).where(MateriPembelajaran.c.id_materi == id_materi)
-    with engine.connect() as conn:
-        existing = conn.execute(q).mappings().first()
+    existing = engine.execute(q).mappings().first()
 
     if not existing:
         raise HTTPException(status_code=404, detail="Materi tidak ditemukan")
 
+    # =======================================================
+    # RESET DATA JIKA JENIS MATERI BERUBAH
+    # =======================================================
+    if jenis_materi:
+        jenis_baru = jenis_materi.lower()
+        jenis_lama = (existing["jenis_materi"] or "").lower()
+
+        if jenis_baru != jenis_lama:
+            # Jika ganti ke PDF
+            if jenis_baru.startswith("dokumen"):
+                upd_vals["text_materi"] = None
+                upd_vals["video_materi"] = None
+                new_file_list = []  # hapus semua file lama (gambar, dll)
+
+            # Jika ganti ke TEKS
+            elif jenis_baru.startswith("teks"):
+                upd_vals["video_materi"] = None
+                new_file_list = []
+
+            # Jika ganti ke VIDEO
+            elif jenis_baru.startswith("video"):
+                upd_vals["text_materi"] = None
+                new_file_list = []
+
     old_files = existing["file_materi"].split(",") if existing["file_materi"] else []
     new_file_list = old_files.copy()
+
+    # =======================================================
+    # VALIDASI KERAS: JIKA JENIS DOKUMEN, PDF WAJIB ADA
+    # =======================================================
+    if jenis_materi and jenis_materi.lower().startswith("dokumen"):
+        if not file_materi:
+            raise HTTPException(
+                status_code=400,
+                detail="Materi PDF wajib memiliki file PDF"
+            )
 
     # =======================================================
     # 1. Jika upload PDF baru
@@ -202,8 +232,7 @@ def update_materi(
         save_path = os.path.join(PATH_PDF_URL, pdf_name)
         with open(save_path, "wb") as f:
             f.write(file_materi.file.read())
-        # Simpan path relatif lengkap (pdf/xxx.pdf) agar frontend bisa akses
-        new_file_list = [f"pdf/{pdf_name}"]
+        new_file_list = [pdf_name]
 
     # =======================================================
     # 2. Jika upload gambar baru (legacy append)
@@ -216,8 +245,7 @@ def update_materi(
             save_path = os.path.join(PATH_IMG_URL, new_name)
             with open(save_path, "wb") as f:
                 f.write(img.file.read())
-            # Simpan path relatif lengkap (img/xxx.png) agar frontend bisa akses
-            new_file_list.append(f"img/{new_name}")
+            new_file_list.append(new_name)
 
     upd_vals["file_materi"] = ",".join(new_file_list) if new_file_list else None
 
@@ -226,8 +254,7 @@ def update_materi(
             MateriPembelajaran.c.id_materi == id_materi
         ).values(**upd_vals)
 
-        with engine.begin() as conn:
-            conn.execute(upd)
+        engine.execute(upd)
 
     return {"status": "ok"}
 
@@ -235,7 +262,7 @@ def update_materi(
 # ============================================================
 # DELETE
 # ============================================================
-@router.delete("/materi/{id_materi}")
+@router.delete("/materi/{id_materi}", dependencies=[Depends(JWTBearer())])
 def delete_materi(id_materi: str = Path(...)):
 
     # Cek apakah materi sudah diakses mahasiswa
@@ -245,9 +272,7 @@ def delete_materi(id_materi: str = Path(...)):
         WHERE tm.id_materi = :id LIMIT 1
     """)
 
-    with engine.connect() as conn:
-        rows = conn.execute(sql, {"id": id_materi}).first()
-    
+    rows = engine.execute(sql, {"id": id_materi}).first()
     if rows:
         raise HTTPException(
             status_code=400,
@@ -258,8 +283,6 @@ def delete_materi(id_materi: str = Path(...)):
     delq = MateriPembelajaran.delete().where(
         MateriPembelajaran.c.id_materi == id_materi
     )
-    
-    with engine.begin() as conn:
-        conn.execute(delq)
+    engine.execute(delq)
 
     return {"status": "ok"}

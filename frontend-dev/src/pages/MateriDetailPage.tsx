@@ -126,12 +126,20 @@ const MateriDetailPage = () => {
       formData.append("judul_materi", data.judul || "");
       formData.append("deskripsi_materi", data.deskripsi || "");
 
-      // mapping jenis materi → field backend
+      // ================================
+      // FIX: mapping jenis materi → BACKEND FORMAT
+      // ================================
       const jenisLower = (data.jenisMateri || "").toLowerCase();
-      let jenisDb = data.jenisMateri || "";
-      if (jenisLower === "dokumen" || jenisLower.includes("pdf")) {
-        jenisDb = "Dokumen PDF";
+
+      let jenisDb = "";
+      if (jenisLower === "dokumen") {
+        jenisDb = "dokumen";
+      } else if (jenisLower === "video") {
+        jenisDb = "video";
+      } else if (jenisLower === "teks") {
+        jenisDb = "teks";
       }
+
       formData.append("jenis_materi", jenisDb);
 
       // field khusus per jenis
