@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Path, Request
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Path, Request, Depends
 from config.database import conn
 from schemas.materi_pembelajaran import MateriOut
+from middleware.auth_bearer import JWTBearer
 from models.materi_pembelajaran import MateriPembelajaran
 from sqlalchemy import select, text
 from decouple import config
@@ -32,7 +33,7 @@ os.makedirs(PATH_IMG_URL, exist_ok=True)
 # UPLOAD IMAGE (dipanggil oleh editor - ReactQuill)
 # Endpoint ini menerima satu gambar dan mengembalikan URL penuh
 # ============================================================
-@router.post("/materi/upload-image")
+@router.post("/materi/upload-image", dependencies=[Depends(JWTBearer())])
 async def upload_materi_image(file: UploadFile = File(...)):
     # Validasi extension sederhana
     allowed_extensions = ("jpg", "jpeg", "png", "gif", "webp")
@@ -63,7 +64,7 @@ async def upload_materi_image(file: UploadFile = File(...)):
 # and insert URLs into text_materi (so create_materi doesn't need article_images)
 # But we keep article_images param for backward compatibility.
 # ============================================================
-@router.post("/materi")
+@router.post("/materi", dependencies=[Depends(JWTBearer())])
 def create_materi(
     judul_materi: str = Form(...),
     deskripsi_materi: str = Form(None),
@@ -124,7 +125,7 @@ def create_materi(
 # ============================================================
 # READ — Semua materi
 # ============================================================
-@router.get("/materi", response_model=list[MateriOut])
+@router.get("/materi", response_model=list[MateriOut], dependencies=[Depends(JWTBearer())])
 def list_all_materi():
     q = select(MateriPembelajaran)
     rows = conn.execute(q).mappings().all()
@@ -134,7 +135,7 @@ def list_all_materi():
 # ============================================================
 # READ by ID
 # ============================================================
-@router.get("/materi/{id_materi}", response_model=MateriOut)
+@router.get("/materi/{id_materi}", response_model=MateriOut, dependencies=[Depends(JWTBearer())])
 def get_materi(id_materi: str):
     q = select(MateriPembelajaran).where(MateriPembelajaran.c.id_materi == id_materi)
     r = conn.execute(q).mappings().first()
@@ -148,7 +149,7 @@ def get_materi(id_materi: str):
 # ============================================================
 # UPDATE — Ubah metadata + bisa upload PDF atau gambar baru (legacy)
 # ============================================================
-@router.put("/materi")
+@router.put("/materi", dependencies=[Depends(JWTBearer())])
 def update_materi(
     id_materi: str = Form(...),
     judul_materi: str = Form(None),
@@ -225,7 +226,7 @@ def update_materi(
 # ============================================================
 # DELETE
 # ============================================================
-@router.delete("/materi/{id_materi}")
+@router.delete("/materi/{id_materi}", dependencies=[Depends(JWTBearer())])
 def delete_materi(id_materi: str = Path(...)):
 
     # Cek apakah materi sudah diakses mahasiswa
