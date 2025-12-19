@@ -59,68 +59,70 @@ async def upload_materi_image(file: UploadFile = File(...)):
 
 
 # ============================================================
-# CREATE — Upload PDF atau image + metadata
-# Note: frontend now will upload images individually via upload-image
-# and insert URLs into text_materi (so create_materi doesn't need article_images)
-# But we keep article_images param for backward compatibility.
+# CREATE — Upload materi (PDF / teks / video)
+# Image TIDAK di-handle di sini
 # ============================================================
 @router.post("/materi", dependencies=[Depends(JWTBearer())])
 def create_materi(
     judul_materi: str = Form(...),
     deskripsi_materi: str = Form(None),
-    jenis_materi: str = Form(...),
-    text_materi: str = Form(None),
-    video_materi: str = Form(None),
-    file_materi: UploadFile = File(None),                  # PDF
-    article_images: list[UploadFile] = File(None)          # Multiple images (optional)
+    jenis_materi: str = Form(...),      # dokumen | teks | video
+    text_materi: str = Form(None),      # berisi HTML + image URL
+    video_materi: str = Form(None),     # link youtube
+    file_materi: UploadFile = File(None)  # PDF
 ):
-    id_ = str(uuid.uuid4())
-    file_list = []  # tempat menyimpan file PDF / IMG (legacy support)
+    id_materi = str(uuid.uuid4())
+    pdf_filename = None
 
     # =======================================================
-    # 1. Jika jenis PDF → Simpan PDF
+    # VALIDASI BERDASARKAN JENIS MATERI
     # =======================================================
-    if jenis_materi and jenis_materi.lower().startswith("dokumen"):
+    jenis = jenis_materi.lower()
+
+    # ---- Materi PDF ----
+    if jenis == "dokumen":
         if not file_materi:
-            raise HTTPException(status_code=400, detail="File PDF wajib diunggah.")
+            raise HTTPException(status_code=400, detail="File PDF wajib diunggah")
         if not file_materi.filename.lower().endswith(".pdf"):
-            raise HTTPException(status_code=400, detail="File harus berformat PDF.")
-        pdf_name = f"{id_}.pdf"
-        save_path = os.path.join(PATH_PDF_URL, pdf_name)
+            raise HTTPException(status_code=400, detail="File harus berformat PDF")
+
+        pdf_filename = f"{id_materi}.pdf"
+        save_path = os.path.join(PATH_PDF_URL, pdf_filename)
+
         with open(save_path, "wb") as f:
             f.write(file_materi.file.read())
-        file_list.append(pdf_name)
+
+    # ---- Materi Video ----
+    elif jenis == "video":
+        if not video_materi:
+            raise HTTPException(status_code=400, detail="Link video wajib diisi")
+
+    # ---- Materi Teks ----
+    elif jenis == "teks":
+        if not text_materi:
+            raise HTTPException(status_code=400, detail="Konten teks wajib diisi")
+
+    else:
+        raise HTTPException(status_code=400, detail="Jenis materi tidak valid")
 
     # =======================================================
-    # 2. Jika ada article_images (legacy) → simpan juga
+    # SIMPAN KE DATABASE
     # =======================================================
-    if article_images:
-        for idx, img in enumerate(article_images):
-            ext = img.filename.split(".")[-1].lower()
-            img_name = f"{id_}-{idx}.{ext}"
-            save_path = os.path.join(PATH_IMG_URL, img_name)
-            with open(save_path, "wb") as f:
-                f.write(img.file.read())
-            file_list.append(img_name)
-
-    # =======================================================
-    # Convert ke string (comma separated)
-    # =======================================================
-    file_materi_value = ",".join(file_list) if file_list else None
-
     ins = MateriPembelajaran.insert().values(
-        id_materi=id_,
+        id_materi=id_materi,
         judul_materi=judul_materi,
         deskripsi_materi=deskripsi_materi,
         jenis_materi=jenis_materi,
-        file_materi=file_materi_value,
+        file_materi=pdf_filename,
         text_materi=text_materi,
         video_materi=video_materi,
     )
     conn.execute(ins)
 
-    return {"status": "ok", "id_materi": id_}
-
+    return {
+        "status": "ok",
+        "id_materi": id_materi
+    }
 
 # ============================================================
 # READ — Semua materi
