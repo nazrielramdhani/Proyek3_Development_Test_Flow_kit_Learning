@@ -1,3 +1,12 @@
+// DESKRIPSI:
+// Halaman ini menangani pembuatan dan pengeditan Topik Pembelajaran.
+// Topik pembelajaran terdiri dari nama, deskripsi, dan daftar materi yang bisa diurutkan.
+
+// ALUR KERJA:
+// - Mode Tambah: User mengisi form -> pilih materi -> simpan (POST topik + PUT mapping)
+// - Mode Edit: Load data topik & materi yang sudah ada -> user ubah -> simpan (PUT topik + PUT mapping)
+// ========================================================================================================
+
 import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form'; // Library untuk manajemen form dengan validasi
 import { useNavigate } from 'react-router-dom'; // Hook untuk navigasi antar halaman
@@ -20,24 +29,36 @@ import { Input } from '@/components/ui/input'; // Input field yang udah di style
 import { FaPlus, FaTrash } from 'react-icons/fa'; // Icon tambah dan hapus
 import { AiFillCaretUp, AiFillCaretDown } from 'react-icons/ai'; // Icon panah naik dan turun
 
+// ==================================================================================
+//                  BAGIAN 1: TYPE DEFINITIONS (Definisi Tipe Data)
+// ==================================================================================
+// Mendefinisikan struktur data untuk Materi pembelajaran
+// Ini membantu TypeScript memvalidasi tipe data dan memberikan autocomplete
 interface Materi {
-  id: string; // ID unik materi 
+  id: string; // ID unik materi (dari database)
   name: string; // Nama/judul materi
   description: string; // Deskripsi materi
   type: string; // Jenis materi: 'teks', 'pdf', 'video'
   nomor_urutan?: number; // Nomor urutan materi dalam topik 
 }
 
-//=========== HELPER FUNCTIONS (Fungsi Pembantu) ==========
+// ==================================================================================
+//             BAGIAN 2: HELPER FUNCTIONS (Fungsi Pembantu)
+// ==================================================================================
+
 const renumber = (list: Materi[]): Materi[] =>
   list.map((m, idx) => ({ 
-    ...m, // copy semua property dari object m
+    ...m, // Spread operator: copy semua property dari object m
     nomor_urutan: idx + 1 // Override nomor_urutan dengan urutan baru (mulai dari 1)
   }));
 
-
-//========= KOMPONEN UTAMA - TopicDetailPage ==========
+// ========================================================================================================
+// BAGIAN 3: KOMPONEN UTAMA - TopicDetailPage
+// ========================================================================================================
 const TopicDetailPage: React.FC = () => {
+  // ------------------------------------------------------------------------------------------------------
+  // SUB-BAGIAN 3.1: SETUP AWAL & HOOKS
+  // ------------------------------------------------------------------------------------------------------
   
   // Hook untuk navigasi programmatik (pindah halaman tanpa klik link)
   const navigate = useNavigate();
@@ -46,49 +67,85 @@ const TopicDetailPage: React.FC = () => {
   // Format: VITE_API_URL=http://localhost:3000/api
   const API_URL = (import.meta.env.VITE_API_URL as string) || '';
 
-  //========= AUTHENTIKASI & AUTHORIZATION ==========
+  // ------------------------------------------------------------------------------------------------------
+  // SUB-BAGIAN 3.2: AUTHENTIKASI & AUTHORIZATION
+  // ------------------------------------------------------------------------------------------------------
+  
   // Ambil data session dari localStorage (tempat penyimpanan browser)
   const sessionData = localStorage.getItem('session');
   
   // Inisialisasi API key dengan default dari environment
   let apiKey = (import.meta.env.VITE_API_KEY as string) || '';
-  let session: any = null; 
+  let session: any = null; // Variable untuk menyimpan data session yang sudah di-parse
   
+  // Coba parse data session dari JSON string menjadi object
   if (sessionData) {
     try {
       session = JSON.parse(sessionData); // Convert string JSON ke object JavaScript
-      apiKey = session.token ?? apiKey; 
+      apiKey = session.token ?? apiKey; // Gunakan token dari session, fallback ke env API key
     } catch {
       // Jika parse gagal (data corrupt), abaikan error dan gunakan default apiKey
     }
   }
 
-  // ====== DETEKSI MODE (Tambah atau Edit ======
+  // ------------------------------------------------------------------------------------------------------
+  // SUB-BAGIAN 3.3: DETEKSI MODE (Tambah atau Edit)
+  // ------------------------------------------------------------------------------------------------------
+  
   // Ambil parameter 'id_topik' dari URL query string
+  // Contoh URL: /topic-detail?id_topik=123
   // Jika ada id_topik, berarti mode EDIT. Jika tidak ada, mode TAMBAH BARU
   const queryParameters = new URLSearchParams(window.location.search);
   const topikId = queryParameters.get('id_topik');
 
-  // ====== STATE MANAGEMENT (Manajemen State) ========
+  // ------------------------------------------------------------------------------------------------------
+  // SUB-BAGIAN 3.4: STATE MANAGEMENT (Manajemen State)
+  // ------------------------------------------------------------------------------------------------------
+  // State adalah data yang bisa berubah dan menyebabkan komponen re-render saat berubah
+  
   // State untuk judul halaman (berubah tergantung mode tambah/edit)
   const [screenName, setScreenName] = useState<string>(
     topikId ? 'Edit Topik Pembelajaran' : 'Tambah Topik Pembelajaran'
   );
 
-  const [isSelectMateriDialogOpen, setIsSelectMateriDialogOpen] = useState<boolean>(false); // State untuk kontrol tampilan dialog pemilihan materi
-  const [selectedMateri, setSelectedMateri] = useState<Materi[]>([]); // State untuk menyimpan daftar materi yang dipilih user
-  const [infoMessage, setInfoMessage] = useState<string | null>(null); // State untuk pesan sukses global (ditampilkan di atas form)
-  const [errorMessage, setErrorMessage] = useState<string | null>(null); // State untuk pesan error global
-  const [materiError, setMateriError] = useState<string | null>(null); // State untuk error khusus validasi materi (misal: materi kosong)
-  const [showConfirmation, setShowConfirmation] = useState<boolean>(false); // State untuk kontrol modal konfirmasi delete
-  const [materiToDelete, setMateriToDelete] = useState<Materi | null>(null); // State untuk menyimpan materi mana yang akan dihapus
-  const [infoMateriMessage, setInfoMateriMessage] = useState<string | null>(null); // State untuk pesan sukses operasi pada materi (tambah/hapus/urut)
-  const [topicName, setTopicName] = useState<string>(''); // State untuk nama topik (digunakan saat membuka dialog pemilihan materi)
+  // State untuk kontrol tampilan dialog pemilihan materi
+  const [isSelectMateriDialogOpen, setIsSelectMateriDialogOpen] = useState<boolean>(false);
 
+  // State untuk menyimpan daftar materi yang dipilih user
+  const [selectedMateri, setSelectedMateri] = useState<Materi[]>([]);
+
+  // State untuk pesan sukses global (ditampilkan di atas form)
+  const [infoMessage, setInfoMessage] = useState<string | null>(null);
+
+  // State untuk pesan error global
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // State untuk error khusus validasi materi (misal: materi kosong)
+  const [materiError, setMateriError] = useState<string | null>(null);
+
+  // State untuk kontrol modal konfirmasi delete
+  const [showConfirmation, setShowConfirmation] = useState<boolean>(false);
+
+  // State untuk menyimpan materi mana yang akan dihapus
+  const [materiToDelete, setMateriToDelete] = useState<Materi | null>(null);
+
+  // State untuk pesan sukses operasi pada materi (tambah/hapus/urut)
+  const [infoMateriMessage, setInfoMateriMessage] = useState<string | null>(null);
+
+  // State untuk nama topik (digunakan saat membuka dialog pemilihan materi)
+  const [topicName, setTopicName] = useState<string>('');
+
+  // ------------------------------------------------------------------------------------------------------
+  // SUB-BAGIAN 3.5: FORM MANAGEMENT dengan React Hook Form
+  // ------------------------------------------------------------------------------------------------------
+  
   // useForm adalah hook dari react-hook-form untuk mengelola form
+  // mode: 'onBlur' = validasi dijalankan saat user keluar dari input field
   const form = useForm({ mode: 'onBlur' });
 
-  //HELPER FUNCTION - typeColor (Warna Badge Jenis Materi)
+  // ------------------------------------------------------------------------------------------------------
+  // SUB-BAGIAN 3.6: HELPER FUNCTION - typeColor (Warna Badge Jenis Materi)
+  // ------------------------------------------------------------------------------------------------------
   const typeColor = (type: string | undefined) => {
     const t = (type || '').toLowerCase(); // Konversi ke lowercase untuk case-insensitive comparison
     
@@ -107,7 +164,10 @@ const TopicDetailPage: React.FC = () => {
     }
   };
 
-  const handleAddMateri = (materis: Materi[]) => { // HANDLER - Menambah Materi dari Dialog
+  // ------------------------------------------------------------------------------------------------------
+  // SUB-BAGIAN 3.7: HANDLER - Menambah Materi dari Dialog
+  // ------------------------------------------------------------------------------------------------------
+  const handleAddMateri = (materis: Materi[]) => {
     setSelectedMateri(prev => { // prev = state sebelumnya
       const merged = [...prev]; // Buat copy array untuk immutability
       
@@ -128,9 +188,15 @@ const TopicDetailPage: React.FC = () => {
     });
   };
 
-  const handleCancel = () => navigate('/learning-topics'); // HANDLER - Batal (Cancel)
+  // ------------------------------------------------------------------------------------------------------
+  // SUB-BAGIAN 3.8: HANDLER - Batal (Cancel)
+  // ------------------------------------------------------------------------------------------------------
+  const handleCancel = () => navigate('/learning-topics');
 
-  const saveMappingMateri = async (id_topik: string, listMateri: Materi[]) => { // API FUNCTION - Simpan Mapping Materi ke Backend
+  // ------------------------------------------------------------------------------------------------------
+  // SUB-BAGIAN 3.9: API FUNCTION - Simpan Mapping Materi ke Backend
+  // ------------------------------------------------------------------------------------------------------
+  const saveMappingMateri = async (id_topik: string, listMateri: Materi[]) => {
     // Transform array Materi menjadi format yang dibutuhkan backend
     const mapping = renumber(listMateri).map(m => ({
       id_materi: m.id,
@@ -158,7 +224,9 @@ const TopicDetailPage: React.FC = () => {
     }
   };
 
-  // ======= API FUNCTION - Tambah Topik Baru (POST) =========
+  // ------------------------------------------------------------------------------------------------------
+  // SUB-BAGIAN 3.10: API FUNCTION - Tambah Topik Baru (POST)
+  // ------------------------------------------------------------------------------------------------------
   /**
    * PARAMETER:
    * @param topik - Object berisi nama_topik & deskripsi_topik
@@ -208,7 +276,9 @@ const TopicDetailPage: React.FC = () => {
     }
   };
 
-  // ===== API FUNCTION - Edit Topik (PUT) ======
+  // ------------------------------------------------------------------------------------------------------
+  // SUB-BAGIAN 3.11: API FUNCTION - Edit Topik (PUT)
+  // ------------------------------------------------------------------------------------------------------
   /**
    * PARAMETER:
    * @param id - ID topik yang akan diupdate
@@ -264,7 +334,9 @@ const TopicDetailPage: React.FC = () => {
     }
   };
 
-  // ===== HANDLER - Submit & Validasi Form =====
+  // ------------------------------------------------------------------------------------------------------
+  // SUB-BAGIAN 3.12: HANDLER - Submit & Validasi Form
+  // ------------------------------------------------------------------------------------------------------
   const handleSave = async () => {
     // Trigger validasi form menggunakan react-hook-form
     const ok = await form.trigger();
@@ -295,10 +367,12 @@ const TopicDetailPage: React.FC = () => {
     }
   };
 
-  // ===== API FUNCTION - Fetch Detail Topik (untuk Mode Edit) =====
+  // ------------------------------------------------------------------------------------------------------
+  // SUB-BAGIAN 3.13: API FUNCTION - Fetch Detail Topik (untuk Mode Edit)
+  // ------------------------------------------------------------------------------------------------------
   const fetchDetail = async (id: string) => {
     try {
-      // === Fetch materi yang terkait dengan topik ===
+      // === STEP 1: Fetch materi yang terkait dengan topik ===
       const resp = await fetch(`${API_URL}/topik-pembelajaran/${id}/materi`, {
         method: 'GET',
         headers: { 
@@ -311,18 +385,20 @@ const TopicDetailPage: React.FC = () => {
       const d = await resp.json().catch(() => null);
 
       // Normalisasi response ke array
+      // Handle: response bisa array langsung atau object dengan property 'data'
       const rows =
         d && Array.isArray(d) ? d : d && Array.isArray(d.data) ? d.data : [];
 
-      // === Map data backend ke interface Materi ===
+      // === STEP 2: Map data backend ke interface Materi ===
+      // Backend bisa pakai naming convention berbeda (id_materi, ms_id_materi, dll)
       const mapped: Materi[] = (rows || []).map((m: any, idx: number) => ({
-        // ambil ID dari berbagai kemungkinan field name
+        // Coba ambil ID dari berbagai kemungkinan field name
         id: m.id_materi ?? m.ms_id_materi ?? m.id ?? '',
         
-        // ambil nama dari berbagai kemungkinan field name
+        // Coba ambil nama dari berbagai kemungkinan field name
         name: m.judul_materi ?? m.ms_nama_modul ?? m.judul ?? m.name ?? '',
         
-        // ambil deskripsi dari berbagai kemungkinan field name
+        // Coba ambil deskripsi dari berbagai kemungkinan field name
         description:
           m.deskripsi_materi ??
           m.ms_deskripsi_modul ??
@@ -330,7 +406,7 @@ const TopicDetailPage: React.FC = () => {
           m.description ??
           '',
         
-        // ambil tipe dari berbagai kemungkinan field name
+        // Coba ambil tipe dari berbagai kemungkinan field name
         type: m.jenis_materi ?? m.type ?? 'default',
         
         // Gunakan nomor_urutan dari backend, fallback ke index+1
@@ -340,7 +416,7 @@ const TopicDetailPage: React.FC = () => {
             : idx + 1,
       }));
 
-      // === Sort & renumber ===
+      // === STEP 3: Sort & renumber ===
       // Sort by nomor_urutan untuk tampilan terurut
       mapped.sort(
         (a, b) => (a.nomor_urutan ?? 0) - (b.nomor_urutan ?? 0)
@@ -349,7 +425,7 @@ const TopicDetailPage: React.FC = () => {
       // Set state dengan data yang sudah di-renumber
       setSelectedMateri(renumber(mapped));
 
-      // === Fetch data topik untuk isi form ===
+      // === STEP 4: Fetch data topik untuk isi form ===
       const respTopik = await fetch(`${API_URL}/topik-pembelajaran`, {
         method: 'GET',
         headers: { 
@@ -357,6 +433,8 @@ const TopicDetailPage: React.FC = () => {
           Authorization: `Bearer ${apiKey}` 
         },
       });
+      
+      // Parse array topik
       const arr = await respTopik.json().catch(() => []);
       
       // Cari topik yang sesuai dengan ID
@@ -384,7 +462,9 @@ const TopicDetailPage: React.FC = () => {
     }
   };
 
-  // ====== HANDLER - Delete Materi dengan Konfirmasi ======
+  // ------------------------------------------------------------------------------------------------------
+  // SUB-BAGIAN 3.14: HANDLER - Delete Materi dengan Konfirmasi
+  // ------------------------------------------------------------------------------------------------------
 
   const handleDeleteMateri = (m: Materi) => {
     setShowConfirmation(true); // Tampilkan modal
@@ -397,6 +477,8 @@ const TopicDetailPage: React.FC = () => {
       setSelectedMateri(prev =>
         renumber(prev.filter(x => x.id !== materiToDelete.id))
       );
+      
+      // Tampilkan pesan sukses
       setInfoMateriMessage('Materi berhasil dihapus dari topik');
       
       // Reset state modal
@@ -408,19 +490,28 @@ const TopicDetailPage: React.FC = () => {
     }
   };
 
-  // cancelDelete - User membatalkan penghapusan
+  /**
+   * cancelDelete - User membatalkan penghapusan
+   * Cukup close modal tanpa ubah data apapun
+   */
   const cancelDelete = () => {
     setShowConfirmation(false);
     setMateriToDelete(null);
   };
 
-  // ======= useEffect - Validasi Session & Load Data =======
+  // ------------------------------------------------------------------------------------------------------
+  // SUB-BAGIAN 3.15: useEffect - Validasi Session & Load Data
+  // ------------------------------------------------------------------------------------------------------
   useEffect(() => {
+    // === VALIDASI 1: Cek session login ===
     if (!session) {
       // Jika tidak ada session, redirect ke login
       navigate('/login');
     } 
-    else if (session.login_type !== 'teacher') { navigate('/dashboard-student');
+    // === VALIDASI 2: Cek role user ===
+    else if (session.login_type !== 'teacher') {
+      // Jika bukan teacher, redirect ke dashboard student
+      navigate('/dashboard-student');
     } 
     // === JIKA LOLOS VALIDASI ===
     else {
@@ -429,16 +520,19 @@ const TopicDetailPage: React.FC = () => {
         fetchDetail(topikId);
       }
     }
-  }, [topikId]); //run ulang jika topikId berubah
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topikId]); // Dependency array: run ulang jika topikId berubah
 
-  // ====== HANDLER - Pengurutan Materi (Move Up/Down) =======
+  // ------------------------------------------------------------------------------------------------------
+  // SUB-BAGIAN 3.16: HANDLER - Pengurutan Materi (Move Up/Down)
+  // ------------------------------------------------------------------------------------------------------
   const moveUp = (index: number) => {
     // Guard: jika sudah di posisi paling atas, ignore
     if (index <= 0) return;
     
     // Swap dengan item di atasnya
     setSelectedMateri(prev => {
-      const arr = [...prev];
+      const arr = [...prev]; // Copy array untuk immutability
       
       // Destructuring swap: tukar posisi dua element
       [arr[index - 1], arr[index]] = [arr[index], arr[index - 1]];
@@ -461,13 +555,18 @@ if (index >= prev.length - 1) return prev;
   return renumber(arr);
 });
 };
-
-// ====== RENDER UI (Return JSX) =======
+// ========================================================================================================
+// BAGIAN 4: RENDER UI (Return JSX)
+// ========================================================================================================
+// JSX adalah syntax seperti HTML dalam JavaScript
 // React akan compile ini menjadi DOM elements
 return (
+// Wrapper layout untuk halaman form
 <LayoutForm screenName={screenName}>
-
-  {/* Global Messages (Alert Boxes)    */}
+  {/* ============================================ */}
+  {/* SECTION 1: Global Messages (Alert Boxes)    */}
+  {/* ============================================ */}
+  
   {/* Pesan sukses global - tampil saat infoMessage tidak null */}
   {infoMessage && (
     <div className="p-4 mb-4 text-green-500 bg-green-100 rounded-md">
@@ -492,8 +591,12 @@ return (
   {/* Container utama dengan full screen */}
   <div className="flex flex-col w-screen min-h-screen p-6">
     
-\
-    {/*          Form Topik (Nama & Deskripsi)       */}
+    {/* ============================================ */}
+    {/* SECTION 2: Form Topik (Nama & Deskripsi)    */}
+    {/* ============================================ */}
+    
+    {/* Form wrapper dari react-hook-form */}
+    {/* Spread operator {...form} untuk pass semua method form ke Form component */}
     <Form {...form}>
       <form className="space-y-6">
         {/* Card putih dengan shadow untuk form */}
@@ -555,7 +658,7 @@ return (
             />
           </div>
 
-          {/* =================== Deskripsi Topik =================== */}
+          {/* =================== FIELD 2: Deskripsi Topik =================== */}
           <div className="flex items-start">
             <FormField
               control={form.control}
@@ -590,9 +693,13 @@ return (
       </form>
     </Form>
 
-    {/*             Daftar Materi Pembelajaran       */}
+    {/* ============================================ */}
+    {/* SECTION 3: Daftar Materi Pembelajaran       */}
+    {/* ============================================ */}
     
     <div className="bg-white rounded-lg shadow-md p-6">
+      
+      {/* Header: Judul + Tombol Tambah */}
       <div className="flex justify-between items-center mb-3">
         {/* Judul dengan tanda bintang (minimal 1 materi required) */}
         <h2 className="text-gray-700 text-base lg:text-lg font-bold">
@@ -623,6 +730,15 @@ return (
           {/* Table Header */}
           <thead>
             <tr className="bg-blue-800 text-white">
+              {/* 
+                PROPORSI KOLOM:
+                - No: 5%
+                - Nama Materi: 25%
+                - Deskripsi: 45% (kolom terbesar untuk konten panjang)
+                - Jenis Materi: 15%
+                - Action: 10%
+                Total: 100%
+              */}
               <th className="py-3 px-2 md:px-6 border w-[5%]">No</th>
               <th className="py-3 px-2 md:px-6 border w-[25%]">Nama Materi</th>
               <th className="py-3 px-2 md:px-6 border w-[45%]">Deskripsi</th>
@@ -647,7 +763,7 @@ return (
               /* Jika ada materi, map ke table rows */
               selectedMateri.map((m: Materi, index: number) => (
                 <tr
-                  key={m.id || index} // Key untuk React 
+                  key={m.id || index} // Key untuk React reconciliation (prefer ID, fallback index)
                   
                   // Alternating row colors (zebra striping)
                   className={`${
@@ -731,7 +847,10 @@ return (
       </p>
     </div>
 
-    {/*        Action Buttons (Batal & Simpan)       */}
+    {/* ============================================ */}
+    {/* SECTION 4: Action Buttons (Batal & Simpan)  */}
+    {/* ============================================ */}
+    
     <div className="flex justify-end mt-6">
       {/* Button Batal - outline style */}
       <Button
@@ -751,20 +870,25 @@ return (
     </div>
   </div>
 
-  {/*              Modals & Dialogs                */}
+  {/* ============================================ */}
+  {/* SECTION 5: Modals & Dialogs                 */}
+  {/* ============================================ */}
+  
   {/* Dialog Pemilihan Materi */}
+  {/* Komunikasi parent-child via props */}
   <SelectMateriDialog
     isDialogOpen={isSelectMateriDialogOpen} // State: dialog open/close
-    setIsDialogOpen={setIsSelectMateriDialogOpen} 
+    setIsDialogOpen={setIsSelectMateriDialogOpen} // Function untuk toggle dialog
     onAddMateri={handleAddMateri} // Callback saat user pilih materi
-    selectedMateri={selectedMateri} // Materi yang sudah dipilih 
+    selectedMateri={selectedMateri} // Materi yang sudah dipilih (untuk disable di dialog)
     topicName={topicName} // Nama topik (ditampilkan di header dialog)
   />
 
   {/* Modal Konfirmasi Hapus Materi */}
+  {/* Conditional rendering: hanya tampil jika showConfirmation = true */}
   {showConfirmation && (
     <ConfirmationModal
-      message="Apakah Anda yakin ingin menghapus materi ini?"
+      message="Apakah Anda yakin ingin menghapus materi ini?" // Pesan konfirmasi
       onConfirm={confirmDelete} // Callback saat user klik "Ya"
       onCancel={cancelDelete} // Callback saat user klik "Tidak"
     />

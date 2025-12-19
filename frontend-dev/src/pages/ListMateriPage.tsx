@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { FaPlus, FaSearch, FaTrash, FaEdit } from "react-icons/fa"; // react itu nama pustaka 
-import Sidebar from "../components/custom/Sidebar"; // menghubungan ke sidebar
-import Pagination from "@/components/custom/Pagination"; //previous & next
-import ConfirmationModal from "../components/custom/ConfirmationModal"; // ini buat pop up verifikasi apakah anda ingin menghapus, publish/unpublish
-import { useNavigate } from "react-router-dom"; // kalo mau pindah" halaman gausah refresh lagi, jdi langsung pindah
+import { FaPlus, FaSearch, FaTrash, FaEdit } from "react-icons/fa";
+import Sidebar from "../components/custom/Sidebar";
+import Pagination from "@/components/custom/Pagination";
+import ConfirmationModal from "../components/custom/ConfirmationModal";
+import { useNavigate } from "react-router-dom";
 
-//tipe data
 interface Materi {
   id: string;
   judul: string;
@@ -15,40 +14,39 @@ interface Materi {
 }
 
 const ListMateriPage: React.FC = () => {
-  const apiUrl = import.meta.env.VITE_API_URL; // alamat dasar API
-  let apiKey: string = import.meta.env.VITE_API_KEY; // mengambil API key
+  const apiUrl = import.meta.env.VITE_API_URL;
+  let apiKey: string = import.meta.env.VITE_API_KEY;
 
-  //jaminan bahwa semua permintaan jaringan dari komponen ListMateriPage (untuk mengambil atau menghapus materi) 
-  const sessionData = localStorage.getItem("session"); 
+  const sessionData = localStorage.getItem("session");
   let session = null;
   if (sessionData) {
     session = JSON.parse(sessionData);
     apiKey = session.token;
   }
 
-  // --- STATE --- INISIALISASI
-  const [rawData, setRawData] = useState<Materi[]>([]); 
-  const [materi, setMateri] = useState<Materi[]>([]); 
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true); 
-  const [searchTerm, setSearchTerm] = useState(""); // kata kunci pencarian fix
-  const [searchInput, setSearchInput] = useState(""); 
-  const [currentPage, setCurrentPage] = useState(1); // halaman yang sedang di lihat
-  const [totalPages, setTotalPages] = useState(1); 
+  // --- STATE ---
+  const [rawData, setRawData] = useState<Materi[]>([]);
+  const [materi, setMateri] = useState<Materi[]>([]);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
-  const [showModal, setShowModal] = useState(false); // statu untuk modal konfirmasi hapus 
+  const [showModal, setShowModal] = useState(false);
   const [materiToDelete, setMateriToDelete] = useState<Materi | null>(null);
-  const [infoMessage, setInfoMessage] = useState(""); // memberitahu  operasi ... telah berhasil diselesaikan
-  const [errorMessage, setErrorMessage] = useState(""); // informasi kesalahan yang berasal dari API
+  const [infoMessage, setInfoMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
 
-
+  // TETAP 8 SESUAI PERMINTAAN SEBELUMNYA
   const itemsPerPage = 8; 
   
-  const navigate = useNavigate(); // navigasi buat pindah" halaman
+  const navigate = useNavigate();
 
   // -----------------------------------------------------------
   //      HELPER : WARNA BADGE BERDASARKAN JENIS MATERI
   // -----------------------------------------------------------
-  const typeColor = (type: string | undefined) => { // mewarnai huruf 
+  const typeColor = (type: string | undefined) => {
     const t = (type || "").toLowerCase();
     switch (t) {
       case "teks":
@@ -76,25 +74,25 @@ const ListMateriPage: React.FC = () => {
         (m.deskripsi && m.deskripsi.toLowerCase().includes(lowerKeyword))
     );
 
-    // 2. Total Pages, menghitung total item setelah di saring
+    // 2. Total Pages
     const totalItems = filteredData.length;
-    const totalPagesCount = Math.max(1, Math.ceil(totalItems / itemsPerPage)); // pake rumus matematika buat ngebulatin ke atas
-    setTotalPages(totalPagesCount); // memperbarui state totalpage
+    const totalPagesCount = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+    setTotalPages(totalPagesCount);
 
     // 3. Paginate
-    const startIndex = (page - 1) * itemsPerPage; // potongan data baru harus dimulai
-    const endIndex = startIndex + itemsPerPage; 
-    const paginatedData = filteredData.slice(startIndex, endIndex); // array baru yang hanya berisi 8 item yang akan ditampilkan di tabel pada halaman saat ini
+    const startIndex = (page - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedData = filteredData.slice(startIndex, endIndex);
 
     // 4. Update State
-    setMateri(paginatedData); // mengatur data yang akan ditampilkan di tabel 
-    setCurrentPage(page); // mengatur halaman saat ini
+    setMateri(paginatedData);
+    setCurrentPage(page);
   };
 
   // --- FETCH DATA ---
-  const fetchDataMateri = async (page: number, keyword: string) => { // fungsi untuk mengambil data, menerima halaman dan kata kunci untuk konsistensi
+  const fetchDataMateri = async (page: number, keyword: string) => {
     try {
-      const res = await fetch(`${apiUrl}/materi?page=${page}&limit=1000`, { // melakukan get/meminta data materi dengan limit 1000
+      const res = await fetch(`${apiUrl}/materi?page=${page}&limit=1000`, {
         method: "GET",
         headers: {
           Accept: "application/json",
@@ -102,10 +100,10 @@ const ListMateriPage: React.FC = () => {
         },
       });
 
-      if (res.status === 403) return navigate("/error"); // untuk mengarahkan ke halaman error
+      if (res.status === 403) return navigate("/error");
 
       const data = await res.json();
-      const list: Materi[] = data.map((m: any) => ({ // Memproses data JSON yang diterima
+      const list: Materi[] = data.map((m: any) => ({
         id: m.id_materi,
         judul: m.judul_materi,
         deskripsi: m.deskripsi_materi,
@@ -122,9 +120,9 @@ const ListMateriPage: React.FC = () => {
         jml_mahasiswa: m.jml_mahasiswa ?? 0,
       }));
 
-      setRawData(list); // menyimpan data lengkap yang bersih ke state rawData
-      filterAndPaginateData(list, keyword, page); // Memanggil fungsi pemfilteran 
-    } catch (err) { //Blok penanganan error untuk kasus gagal koneksi/respons non-JSON
+      setRawData(list);
+      filterAndPaginateData(list, keyword, page);
+    } catch (err) {
       console.error(err);
       setRawData([]);
       setMateri([]);
@@ -133,11 +131,11 @@ const ListMateriPage: React.FC = () => {
   };
 
   // --- DELETE LOGIC ---
-  const handleDeleteConfirmed = async () => { // Dipanggil setelah pengguna mengklik "Ya, Hapus" 
+  const handleDeleteConfirmed = async () => {
     if (!materiToDelete) return;
 
     try {
-      const res = await fetch(`${apiUrl}/materi/${materiToDelete.id}`, { //Melakukan permintaan DELETE ke endpoint /materi/:id menggunakan token otorisasi.
+      const res = await fetch(`${apiUrl}/materi/${materiToDelete.id}`, {
         method: "DELETE",
         headers: {
           Accept: "application/json",
@@ -145,20 +143,20 @@ const ListMateriPage: React.FC = () => {
         },
       });
 
-      if (!res.ok) { //Jika respons tidak berhasil, menampilkan pesan error dan menghilangkannya setelah 2.5 detik.
+      if (!res.ok) {
         const d = await res.json();
         setErrorMessage(d.detail || "Gagal menghapus materi.");
         setTimeout(() => setErrorMessage(""), 2500);
-      } else { // Jika respons berhasil  
+      } else {
         setInfoMessage("Materi berhasil dihapus.");
         setTimeout(() => setInfoMessage(""), 2000);
-        fetchDataMateri(1, searchTerm); // memuat ulang data dari halaman 1 agar data yang terhapus hilang dari tabel
+        fetchDataMateri(1, searchTerm); 
       }
     } catch (err) {
       console.error(err);
     }
 
-    setShowModal(false); // Menutup modal dan mereset state materi yang akan dihapus
+    setShowModal(false);
     setMateriToDelete(null);
   };
 
@@ -167,41 +165,39 @@ const ListMateriPage: React.FC = () => {
     const keyword = e.target.value;
     setSearchInput(keyword);
     setSearchTerm(keyword);
-    filterAndPaginateData(rawData, keyword, 1); // untuk filter data secara real-time, dimulai dari halaman 1
+    filterAndPaginateData(rawData, keyword, 1);
   };
 
-  const handleSearchSubmit = (e: React.FormEvent<HTMLFormElement>) => { // Mencegah perilaku bawaan 
+  const handleSearchSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
   };
 
-  const toggleSidebar = () => setIsSidebarOpen((prev) => !prev); // Membalikkan status buka/tutup Sidebar.
+  const toggleSidebar = () => setIsSidebarOpen((prev) => !prev);
 
-  const openDeleteModal = (m: Materi) => { // Mengatur state materi yang akan dihapus dan menampilkan modal konfirmasi
+  const openDeleteModal = (m: Materi) => {
     setMateriToDelete(m);
     setShowModal(true);
   };
 
-  const navigateAdd = () => navigate("/add-materi"); // Mengarahkan pengguna ke halaman penambahan materi
-  const navigateEdit = (m: Materi) => navigate(`/add-materi?id=${m.id}`); 
+  const navigateAdd = () => navigate("/add-materi");
+  const navigateEdit = (m: Materi) => navigate(`/add-materi?id=${m.id}`);
 
-  const handlePageChange = (page: number) => { // Dipanggil dari komponen Pagination saat halaman berubah
+  const handlePageChange = (page: number) => {
     filterAndPaginateData(rawData, searchTerm, page);
   };
 
+  useEffect(() => {
+    if (!session) return navigate("/login");
+    if (session.login_type !== "teacher") return navigate("/dashboard-student");
 
-  useEffect(() => { // Efek samping 
-    if (!session) return navigate("/login"); //Jika data session tidak ada, arahkan ke halaman /login.
-    if (session.login_type !== "teacher") return navigate("/dashboard-student"); // Jika login bukan sebagai "teacher" (guru), arahkan ke dashboard siswa
-
-    fetchDataMateri(1, searchTerm); 
+    fetchDataMateri(1, searchTerm);
   }, []);
 
-  // JSX Struktur tampilan
   return (
-    <div className="flex flex-col lg:flex-row w-screen"> {/* Container utama dengan tata letak flex (kolom pada ukuran kecil, baris pada ukuran besar)*/}
-      <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} /> {/*Menampilkan komponen Sidebar, mengontrol tampilan dan fungsionalitas buka/tutup.*/}
+    <div className="flex flex-col lg:flex-row w-screen">
+      <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
 
-      <div className={`flex-1 ${isSidebarOpen ? "ml-64" : "ml-20"} transition-all`}> {/* mengatur margin kiri*/}
+      <div className={`flex-1 ${isSidebarOpen ? "ml-64" : "ml-20"} transition-all`}>
         <div className="w-full bg-white p-4 shadow mb-6">
           <div className="max-w-screen-xl mx-auto">
             <h1 className="lg:text-2xl text-xl font-bold text-blue-800 mb-6 mt-4">
@@ -210,7 +206,7 @@ const ListMateriPage: React.FC = () => {
 
             {/* SEARCH */}
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-              <form className="relative w-full md:w-1/2" onSubmit={handleSearchSubmit}> {/*untuk mencegar refresh*/}
+              <form className="relative w-full md:w-1/2" onSubmit={handleSearchSubmit}>
                 <input
                   type="text"
                   placeholder="Search or type"
@@ -232,7 +228,6 @@ const ListMateriPage: React.FC = () => {
           </div>
         </div>
 
-        {/* TABLE */}
         <div className="min-h-screen p-4 md:p-6">
           <div className="bg-white shadow-md rounded-lg overflow-x-auto">
             {infoMessage && (
