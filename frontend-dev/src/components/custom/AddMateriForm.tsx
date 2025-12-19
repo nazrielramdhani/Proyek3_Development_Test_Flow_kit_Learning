@@ -43,6 +43,21 @@ interface AddMateriFormProps {
   };
 }
 
+// ===============================
+// HELPER: Ambil JWT Token User
+// ===============================
+const getAuthToken = () => {
+  const sessionData = localStorage.getItem("session");
+  if (!sessionData) return "";
+
+  try {
+    const session = JSON.parse(sessionData);
+    return session.token || "";
+  } catch {
+    return "";
+  }
+};
+
 const AddMateriForm: React.FC<AddMateriFormProps> = ({ onAddMateri, onCancel, initialData }) => {
   const [fileName, setFileName] = useState<string | null>(null);
   const [fileMateri, setFileMateri] = useState<File | null>(null);
@@ -106,9 +121,14 @@ const AddMateriForm: React.FC<AddMateriFormProps> = ({ onAddMateri, onCancel, in
     const fd = new FormData();
     fd.append("file", file);
 
+    const token = getAuthToken(); // ← helper dipanggil di sini
+
     const uploadEndpoint = `${apiUrl}/materi/upload-image`;
     const res = await fetch(uploadEndpoint, {
       method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`, // ⭐ INI KUNCI
+      },
       body: fd,
     });
 
@@ -118,7 +138,6 @@ const AddMateriForm: React.FC<AddMateriFormProps> = ({ onAddMateri, onCancel, in
     }
 
     const data = await res.json();
-    // data.url expected as absolute URL
     return data.url;
   };
 
@@ -308,35 +327,35 @@ const AddMateriForm: React.FC<AddMateriFormProps> = ({ onAddMateri, onCancel, in
 
                 {/* Jenis Materi */}
                 <FormField
-                  control={form.control}
-                  name="jenisMateri"
-                  rules={{ required: "Jenis materi harus dipilih!" }}
-                  render={({ field, fieldState: { error } }) => (
-                    <FormItem>
-                      <FormLabel>
-                        Jenis Materi <span className="text-red-500">*</span>
-                      </FormLabel>
-                      <FormControl>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                        >
-                          <SelectTrigger className="w-full bg-white">
-                            <SelectValue placeholder="Pilih Jenis" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-white">
-                            <SelectItem value="Dokumen">Dokumen PDF</SelectItem>
-                            <SelectItem value="Video">Video Youtube</SelectItem>
-                            <SelectItem value="Teks">Teks / Artikel</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </FormControl>
-                      {error && (
-                        <p className="text-red-600 text-sm">{error.message}</p>
-                      )}
-                    </FormItem>
-                  )}
-                />
+                control={form.control}
+                name="jenisMateri"
+                rules={{ required: "Jenis materi harus dipilih!" }}
+                render={({ field, fieldState: { error } }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Jenis Materi <span className="text-red-500">*</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Select
+                        value={field.value || ""} 
+                        onValueChange={field.onChange}
+                      >
+                        <SelectTrigger className="w-full bg-white">
+                          <SelectValue placeholder="Pilih Jenis" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white">
+                          <SelectItem value="Dokumen">Dokumen PDF</SelectItem>
+                          <SelectItem value="Video">Video Youtube</SelectItem>
+                          <SelectItem value="Teks">Teks / Artikel</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    {error && (
+                      <p className="text-red-600 text-sm">{error.message}</p>
+                    )}
+                  </FormItem>
+                )}
+              />
               </CardContent>
             </Card>
           </div>

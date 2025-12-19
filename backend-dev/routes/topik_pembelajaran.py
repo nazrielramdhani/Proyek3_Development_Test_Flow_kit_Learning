@@ -25,8 +25,27 @@ def list_topik():
 # ============================================================
 # CREATE TOPIK PEMBELAJARAN
 # ============================================================
-@router.post("/topik-pembelajaran", dependencies=[Depends(JWTBearer())])
+@router.post("/topik-pembelajaran")
 def create_topik(payload: TopikCreate):
+    # ============================
+    # CEK DUPLIKAT NAMA TOPIK
+    # ============================
+    cek = select(TopikPembelajaran).where(
+        TopikPembelajaran.c.nama_topik == payload.nama_topik
+    )
+
+    with engine.connect() as conn:
+        existing = conn.execute(cek).first()
+
+    if existing:
+        raise HTTPException(
+            status_code=400,
+            detail="Nama topik pembelajaran sudah ada"
+        )
+
+    # ============================
+    # INSERT DATA BARU
+    # ============================
     id_ = str(uuid.uuid4())
 
     ins = TopikPembelajaran.insert().values(
@@ -40,12 +59,33 @@ def create_topik(payload: TopikCreate):
 
     return {"status": "ok", "id_topik": id_}
 
-
 # ============================================================
 # UPDATE TOPIK PEMBELAJARAN (UPDATE FIELD TERTENTU)
 # ============================================================
-@router.put("/topik-pembelajaran", dependencies=[Depends(JWTBearer())])
+@router.put("/topik-pembelajaran")
 def update_topik(payload: TopikUpdate):
+
+    # ============================
+    # CEK DUPLIKAT (KECUALI DIRI SENDIRI)
+    # ============================
+    if payload.nama_topik:
+        cek = select(TopikPembelajaran).where(
+            (TopikPembelajaran.c.nama_topik == payload.nama_topik) &
+            (TopikPembelajaran.c.id_topik != payload.id_topik)
+        )
+
+        with engine.connect() as conn:
+            existing = conn.execute(cek).first()
+
+        if existing:
+            raise HTTPException(
+                status_code=400,
+                detail="Nama topik pembelajaran sudah digunakan"
+            )
+
+    # ============================
+    # UPDATE DATA
+    # ============================
     upd_vals = {
         k: v for k, v in payload.dict().items()
         if v is not None and k != "id_topik"
@@ -64,7 +104,6 @@ def update_topik(payload: TopikUpdate):
         conn.execute(upd)
 
     return {"status": "ok"}
-
 
 # ============================================================
 # PUBLISH TOPIK (SET status_tayang = 1)

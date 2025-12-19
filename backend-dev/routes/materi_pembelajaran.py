@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Path, Request, Depends
-from config.database import conn
+from config.database import engine
 from schemas.materi_pembelajaran import MateriOut
 from middleware.auth_bearer import JWTBearer
 from models.materi_pembelajaran import MateriPembelajaran
@@ -117,7 +117,7 @@ def create_materi(
         text_materi=text_materi,
         video_materi=video_materi,
     )
-    conn.execute(ins)
+    engine.execute(ins)
 
     return {
         "status": "ok",
@@ -130,7 +130,7 @@ def create_materi(
 @router.get("/materi", response_model=list[MateriOut], dependencies=[Depends(JWTBearer())])
 def list_all_materi():
     q = select(MateriPembelajaran)
-    rows = conn.execute(q).mappings().all()
+    rows = engine.execute(q).mappings().all()
     return [dict(r) for r in rows]
 
 
@@ -140,7 +140,7 @@ def list_all_materi():
 @router.get("/materi/{id_materi}", response_model=MateriOut, dependencies=[Depends(JWTBearer())])
 def get_materi(id_materi: str):
     q = select(MateriPembelajaran).where(MateriPembelajaran.c.id_materi == id_materi)
-    r = conn.execute(q).mappings().first()
+    r = engine.execute(q).mappings().first()
 
     if not r:
         raise HTTPException(status_code=404, detail="Materi tidak ditemukan")
@@ -180,13 +180,47 @@ def update_materi(
     # Ambil data lama untuk referensi
     # =======================================================
     q = select(MateriPembelajaran).where(MateriPembelajaran.c.id_materi == id_materi)
-    existing = conn.execute(q).mappings().first()
+    existing = engine.execute(q).mappings().first()
 
     if not existing:
         raise HTTPException(status_code=404, detail="Materi tidak ditemukan")
 
+    # =======================================================
+    # RESET DATA JIKA JENIS MATERI BERUBAH
+    # =======================================================
+    if jenis_materi:
+        jenis_baru = jenis_materi.lower()
+        jenis_lama = (existing["jenis_materi"] or "").lower()
+
+        if jenis_baru != jenis_lama:
+            # Jika ganti ke PDF
+            if jenis_baru.startswith("dokumen"):
+                upd_vals["text_materi"] = None
+                upd_vals["video_materi"] = None
+                new_file_list = []  # hapus semua file lama (gambar, dll)
+
+            # Jika ganti ke TEKS
+            elif jenis_baru.startswith("teks"):
+                upd_vals["video_materi"] = None
+                new_file_list = []
+
+            # Jika ganti ke VIDEO
+            elif jenis_baru.startswith("video"):
+                upd_vals["text_materi"] = None
+                new_file_list = []
+
     old_files = existing["file_materi"].split(",") if existing["file_materi"] else []
     new_file_list = old_files.copy()
+
+    # =======================================================
+    # VALIDASI KERAS: JIKA JENIS DOKUMEN, PDF WAJIB ADA
+    # =======================================================
+    if jenis_materi and jenis_materi.lower().startswith("dokumen"):
+        if not file_materi:
+            raise HTTPException(
+                status_code=400,
+                detail="Materi PDF wajib memiliki file PDF"
+            )
 
     # =======================================================
     # 1. Jika upload PDF baru
@@ -220,7 +254,7 @@ def update_materi(
             MateriPembelajaran.c.id_materi == id_materi
         ).values(**upd_vals)
 
-        conn.execute(upd)
+        engine.execute(upd)
 
     return {"status": "ok"}
 
@@ -238,7 +272,7 @@ def delete_materi(id_materi: str = Path(...)):
         WHERE tm.id_materi = :id LIMIT 1
     """)
 
-    rows = conn.execute(sql, {"id": id_materi}).first()
+    rows = engine.execute(sql, {"id": id_materi}).first()
     if rows:
         raise HTTPException(
             status_code=400,
@@ -249,6 +283,6 @@ def delete_materi(id_materi: str = Path(...)):
     delq = MateriPembelajaran.delete().where(
         MateriPembelajaran.c.id_materi == id_materi
     )
-    conn.execute(delq)
+    engine.execute(delq)
 
     return {"status": "ok"}
