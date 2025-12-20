@@ -106,13 +106,13 @@ def create_materi(
         raise HTTPException(status_code=400, detail="Jenis materi tidak valid")
 
     # =======================================================
-    # SIMPAN KE DATABASE
+    # SIMPAN KE DATABASE (gunakan lowercase untuk konsistensi)
     # =======================================================
     ins = MateriPembelajaran.insert().values(
         id_materi=id_materi,
         judul_materi=judul_materi,
         deskripsi_materi=deskripsi_materi,
-        jenis_materi=jenis_materi,
+        jenis_materi=jenis.lower(),  # Selalu simpan lowercase
         file_materi=pdf_filename,
         text_materi=text_materi,
         video_materi=video_materi,
@@ -173,7 +173,7 @@ def update_materi(
     if deskripsi_materi is not None:
         upd_vals["deskripsi_materi"] = deskripsi_materi
     if jenis_materi is not None:
-        upd_vals["jenis_materi"] = jenis_materi
+        upd_vals["jenis_materi"] = jenis_materi.lower()  # Selalu simpan lowercase
     if text_materi is not None:
         upd_vals["text_materi"] = text_materi
     if video_materi is not None:

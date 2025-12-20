@@ -105,8 +105,18 @@ const TopicDetailPage: React.FC = () => {
         return 'bg-green-100 text-green-700'; 
       case 'video':
         return 'bg-purple-100 text-purple-700'; 
+      default:
         return 'bg-gray-200 text-gray-700'; 
     }
+  };
+
+  // Format jenis materi agar konsisten
+  const formatType = (type: string | undefined) => {
+    const t = (type || '').toLowerCase();
+    if (t.includes("pdf") || t.includes("dokumen")) return "Dokumen PDF";
+    if (t.includes("video")) return "Video";
+    if (t.includes("teks") || t.includes("text")) return "Teks";
+    return type || "Tidak Diketahui";
   };
 
   const handleAddMateri = (materis: Materi[]) => {
@@ -673,7 +683,7 @@ const TopicDetailPage: React.FC = () => {
                         m.type
                       )}`}
                     >
-                      {m.type ?? 'default'}
+                      {formatType(m.type)}
                     </span>
                   </td>
 

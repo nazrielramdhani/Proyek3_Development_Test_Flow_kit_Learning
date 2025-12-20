@@ -504,6 +504,15 @@ const SelectMateriDialog: React.FC<SelectMateriDialogProps> = ({
     }
   };
 
+  // Format jenis materi agar konsisten
+  const formatType = (type: any) => {
+    const safeType = String(type || "").toLowerCase();
+    if (safeType.includes("pdf") || safeType.includes("dokumen")) return "Dokumen PDF";
+    if (safeType.includes("video")) return "Video";
+    if (safeType.includes("teks") || safeType.includes("text")) return "Teks";
+    return type || "Tidak Diketahui";
+  };
+
   const handleAdd = () => {
     // Menghilangkan duplikat jika ada dan mengirim data ke halaman utama
     const unique = Array.from(new Map(tempSelectedMateri.map((x) => [x.id, x])).values());
@@ -584,7 +593,7 @@ const SelectMateriDialog: React.FC<SelectMateriDialogProps> = ({
 
                     <td className="py-2 px-3 border text-center align-middle">
                       <span className={`inline-block min-w-[100px] px-3 py-1 rounded-md text-xs font-semibold text-center ${typeColor(mat.type)}`}>
-                        {mat.type}
+                        {formatType(mat.type)}
                       </span>
                     </td>
                   </tr>

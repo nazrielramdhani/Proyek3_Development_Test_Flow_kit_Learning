@@ -16,6 +16,7 @@ from routes.progress import progress
 from routes.topik_pembelajaran import router as topik_pembelajaran
 from routes.materi_pembelajaran import router as materi_pembelajaran
 from routes.student_topik import router as student_topik
+from routes.student_access import router as student_access
 
 from jobs.schedule import schedule_init, schedule_run_uncomplete, schedule_run_alpha
 from jobs.train_model import run_train_model
@@ -79,6 +80,7 @@ app.include_router(progress)
 app.include_router(topik_pembelajaran)
 app.include_router(materi_pembelajaran)
 app.include_router(student_topik)
+app.include_router(student_access)
 # app.include_router(cfg)
 
 app = cors_headers(app)

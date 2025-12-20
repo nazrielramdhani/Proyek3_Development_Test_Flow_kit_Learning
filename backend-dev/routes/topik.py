@@ -516,6 +516,8 @@ async def track_student_access(request: Request, id_topik: str, response: Respon
     Endpoint untuk mencatat akses mahasiswa ke topik pembelajaran.
     Hanya dihitung 1x per mahasiswa per topik.
     """
+    from config.database import engine
+    
     try:
         currentUser = getDataFromJwt(request)
         student_id = currentUser['userid']
@@ -524,45 +526,44 @@ async def track_student_access(request: Request, id_topik: str, response: Respon
         print(f"[DEBUG] Student ID: {student_id}")
         print(f"[DEBUG] Topic ID: {id_topik}")
         
-        # Cek apakah topik ada di tabel ms_topik
-        topik_check = text("""
-            SELECT id_topik, nama_topik FROM ms_topik WHERE id_topik = :id_topik
-        """)
-        topik_exists = conn.execute(topik_check, id_topik=id_topik).fetchone()
-        
-        if not topik_exists:
-            print(f"[ERROR] Topik dengan ID {id_topik} tidak ditemukan di tabel ms_topik")
-            response.status_code = status.HTTP_404_NOT_FOUND
-            return {"message": f"Topik dengan ID {id_topik} tidak ditemukan"}
-        
-        print(f"[DEBUG] Topik ditemukan: {topik_exists.nama_topik}")
-        
-        # Cek apakah mahasiswa sudah pernah mengakses topik ini
-        check_query = text("""
-            SELECT * FROM student_access 
-            WHERE id_student = :student_id AND id_topik = :id_topik
-        """)
-        existing_access = conn.execute(check_query, student_id=student_id, id_topik=id_topik).fetchone()
-        
-        if existing_access:
-            print(f"[DEBUG] Access already recorded for student {student_id} on topic {id_topik}")
-            # Sudah pernah akses, tidak perlu tambah lagi
-            return {
-                "message": "Akses sudah tercatat sebelumnya",
-                "is_new_access": False
-            }
+        with engine.connect() as connection:
+            # Cek apakah topik ada di tabel ms_topik
+            topik_check = text("""
+                SELECT id_topik, nama_topik FROM ms_topik WHERE id_topik = :id_topik
+            """)
+            topik_exists = connection.execute(topik_check, {"id_topik": id_topik}).fetchone()
+            
+            if not topik_exists:
+                print(f"[ERROR] Topik dengan ID {id_topik} tidak ditemukan di tabel ms_topik")
+                response.status_code = status.HTTP_404_NOT_FOUND
+                return {"message": f"Topik dengan ID {id_topik} tidak ditemukan"}
+            
+            print(f"[DEBUG] Topik ditemukan: {topik_exists.nama_topik}")
+            
+            # Cek apakah mahasiswa sudah pernah mengakses topik ini
+            check_query = text("""
+                SELECT * FROM student_access 
+                WHERE id_student = :student_id AND id_topik = :id_topik
+            """)
+            existing_access = connection.execute(check_query, {"student_id": student_id, "id_topik": id_topik}).fetchone()
+            
+            if existing_access:
+                print(f"[DEBUG] Access already recorded for student {student_id} on topic {id_topik}")
+                return {
+                    "message": "Akses sudah tercatat sebelumnya",
+                    "is_new_access": False
+                }
         
         print(f"[DEBUG] Recording new access for student {student_id} on topic {id_topik}")
         
-        # Gunakan transaction untuk memastikan atomicity
-        trans = conn.begin()
-        try:
+        # Gunakan engine.begin() untuk auto-commit transaction
+        with engine.begin() as connection:
             # Catat akses baru
             insert_query = text("""
                 INSERT INTO student_access (id_student, id_topik, created_at)
                 VALUES (:student_id, :id_topik, NOW())
             """)
-            conn.execute(insert_query, student_id=student_id, id_topik=id_topik)
+            connection.execute(insert_query, {"student_id": student_id, "id_topik": id_topik})
             
             # Update jumlah mahasiswa di ms_topik
             update_query = text("""
@@ -574,24 +575,16 @@ async def track_student_access(request: Request, id_topik: str, response: Respon
                 )
                 WHERE id_topik = :id_topik
             """)
-            conn.execute(update_query, id_topik=id_topik)
+            connection.execute(update_query, {"id_topik": id_topik})
             
-            # Commit transaction
-            trans.commit()
             print(f"[DEBUG] Successfully recorded access and updated count")
-        except Exception as e:
-            # Rollback jika ada error
-            trans.rollback()
-            print(f"[ERROR] Error during transaction: {e}")
-            import traceback
-            traceback.print_exc()
-            raise
         
         # Ambil jumlah mahasiswa terbaru
-        count_query = text("""
-            SELECT jml_mahasiswa FROM ms_topik WHERE id_topik = :id_topik
-        """)
-        result = conn.execute(count_query, id_topik=id_topik).fetchone()
+        with engine.connect() as connection:
+            count_query = text("""
+                SELECT jml_mahasiswa FROM ms_topik WHERE id_topik = :id_topik
+            """)
+            result = connection.execute(count_query, {"id_topik": id_topik}).fetchone()
         
         print(f"[DEBUG] Updated jml_mahasiswa: {result.jml_mahasiswa if result else 0}")
         print(f"[DEBUG] ========== TRACKING SUCCESS ==========")

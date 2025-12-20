@@ -18,6 +18,22 @@ interface LearningTopicsProps {
 
 const LearningTopics: React.FC<LearningTopicsProps> = ({ topics, searchQuery }) => {
   const navigate = useNavigate();
+  const apiUrl = import.meta.env.VITE_API_URL;
+  
+  // Ambil token dari session
+  let apiKey = import.meta.env.VITE_API_KEY;
+  let studentId: string | null = null;
+  const sessionData = localStorage.getItem('session');
+  if (sessionData) {
+    try {
+      const session = JSON.parse(sessionData);
+      apiKey = session.token;
+      studentId = session.id; // id student dari session
+    } catch (e) {
+      console.error("Error parsing session", e);
+    }
+  }
+
   const filterTopics = (topics: LearningTopic[], query: string) => {
     if (!query) return topics;
     return topics.filter((topic) =>
@@ -26,7 +42,26 @@ const LearningTopics: React.FC<LearningTopicsProps> = ({ topics, searchQuery }) 
   };
 
   const filteredLearningTopics = filterTopics(topics, searchQuery);
-  const onLearn = (id: string) => {
+  
+  const onLearn = async (id: string) => {
+    // Record student access ke topik
+    if (studentId) {
+      try {
+        await fetch(`${apiUrl}/student/access`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            id_student: studentId,
+            id_topik: id
+          })
+        });
+      } catch (err) {
+        console.error("Failed to record access:", err);
+      }
+    }
     navigate("/list-challanges?idTopik="+id);
   };
   return (
