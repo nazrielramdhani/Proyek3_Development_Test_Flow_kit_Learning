@@ -5,6 +5,7 @@ from middleware.auth_bearer import JWTBearer
 from models.topik_pembelajaran import TopikPembelajaran
 from models.topik_materi import TopikMateri
 from models.student_access import StudentAccess
+from models.materi_pembelajaran import MateriPembelajaran
 from sqlalchemy import select, text
 import uuid
 
@@ -178,8 +179,29 @@ def list_materi_for_topik(id_topik: str):
 # ============================================================
 # TAMBAHKAN MATERI KE DALAM TOPIK
 # ============================================================
-@router.post("/topik-pembelajaran/{id_topik}/materi", dependencies=[Depends(JWTBearer())])
-def add_materi_to_topik(id_topik: str, id_materi: str):
+@router.post("/topik-pembelajaran/{id_topik}/materi")
+def add_materi_to_topik(id_topik: str, id_materi: str):    # Validasi: Cek apakah id_topik ada di tabel TopikPembelajaran
+    with engine.connect() as conn:
+        topik_exists = conn.execute(
+            select(TopikPembelajaran).where(TopikPembelajaran.c.id_topik == id_topik)
+        ).first()
+        
+        if not topik_exists:
+            raise HTTPException(
+                status_code=400,
+                detail="ID Topik tidak ditemukan"
+            )
+        
+        # Validasi: Cek apakah id_materi ada di tabel MateriPembelajaran
+        materi_exists = conn.execute(
+            select(MateriPembelajaran).where(MateriPembelajaran.c.id_materi == id_materi)
+        ).first()
+        
+        if not materi_exists:
+            raise HTTPException(
+                status_code=400,
+                detail="ID Materi tidak ditemukan"
+            )
     ins = TopikMateri.insert().values(
         id_topik=id_topik,
         id_materi=id_materi,
