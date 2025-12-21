@@ -26,7 +26,7 @@ def list_topik():
 # ============================================================
 # CREATE TOPIK PEMBELAJARAN
 # ============================================================
-@router.post("/topik-pembelajaran")
+@router.post("/topik-pembelajaran", dependencies=[Depends(JWTBearer())])
 def create_topik(payload: TopikCreate):
     # ============================
     # CEK DUPLIKAT NAMA TOPIK
@@ -63,7 +63,7 @@ def create_topik(payload: TopikCreate):
 # ============================================================
 # UPDATE TOPIK PEMBELAJARAN (UPDATE FIELD TERTENTU)
 # ============================================================
-@router.put("/topik-pembelajaran")
+@router.put("/topik-pembelajaran", dependencies=[Depends(JWTBearer())])
 def update_topik(payload: TopikUpdate):
 
     # ============================
