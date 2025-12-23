@@ -3,6 +3,7 @@ from config.database import engine
 from schemas.materi_pembelajaran import MateriOut
 from middleware.auth_bearer import JWTBearer
 from models.materi_pembelajaran import MateriPembelajaran
+from utilities.pdfutil import validate_pdf_content
 from sqlalchemy import select, text
 from decouple import config
 from sqlalchemy.exc import IntegrityError
@@ -87,11 +88,17 @@ def create_materi(
         if not file_materi.filename.lower().endswith(".pdf"):
             raise HTTPException(status_code=400, detail="File harus berformat PDF")
 
+        # Validasi konten PDF (cek corrupt/rusak)
+        file_content = file_materi.file.read()
+        is_valid, error_msg = validate_pdf_content(file_content)
+        if not is_valid:
+            raise HTTPException(status_code=400, detail=error_msg)
+
         pdf_filename = f"{id_materi}.pdf"
         save_path = os.path.join(PATH_PDF_URL, pdf_filename)
 
         with open(save_path, "wb") as f:
-            f.write(file_materi.file.read())
+            f.write(file_content)
 
     # ---- Materi Video ----
     elif jenis == "video":
@@ -233,10 +240,17 @@ def update_materi(
     if file_materi and jenis_materi and jenis_materi.lower().startswith("dokumen"):
         if not file_materi.filename.lower().endswith(".pdf"):
             raise HTTPException(status_code=400, detail="File harus berformat PDF.")
+        
+        # Validasi konten PDF (cek corrupt/rusak)
+        file_content = file_materi.file.read()
+        is_valid, error_msg = validate_pdf_content(file_content)
+        if not is_valid:
+            raise HTTPException(status_code=400, detail=error_msg)
+        
         pdf_name = f"{id_materi}.pdf"
         save_path = os.path.join(PATH_PDF_URL, pdf_name)
         with open(save_path, "wb") as f:
-            f.write(file_materi.file.read())
+            f.write(file_content)
         new_file_list = [pdf_name]
 
     # =======================================================
