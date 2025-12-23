@@ -5,6 +5,7 @@ from middleware.auth_bearer import JWTBearer
 from models.materi_pembelajaran import MateriPembelajaran
 from sqlalchemy import select, text
 from decouple import config
+from sqlalchemy.exc import IntegrityError
 import uuid
 import os
 
@@ -291,5 +292,16 @@ def delete_materi(id_materi: str = Path(...)):
     )
     with engine.begin() as conn:
         conn.execute(delq)
+
+    try:
+        with engine.begin() as conn:
+            conn.execute(delq)
+    except IntegrityError:
+        # This catches the DB error if the file is still used elsewhere
+        raise HTTPException(
+            status_code=400, 
+            detail="Gagal menghapus: Materi ini masih digunakan di Topik atau modul lain."
+        )
+    # --- CHANGE ENDS HERE ---
 
     return {"status": "ok"}

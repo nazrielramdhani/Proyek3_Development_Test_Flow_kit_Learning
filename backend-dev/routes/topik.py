@@ -27,6 +27,8 @@ from xml.dom import minidom
 from sqlalchemy.sql import text
 import math
 from decouple import config
+from fastapi import HTTPException
+from sqlalchemy.exc import IntegrityError
     
 from datetime import date, datetime
 
@@ -300,6 +302,12 @@ async def list_topik(response: Response, id_topik: str):
 @topik.post("/topik/addTopik", dependencies=[Depends(JWTBearer())])
 async def addTopik(request: Request, data_topik: TopikSchema, response: Response):
     currentUser = getDataFromJwt(request)
+
+    if not data_topik.nama_topik or not data_topik.nama_topik.strip():
+        raise HTTPException(
+            status_code=400, 
+            detail="Nama topik tidak boleh kosong"
+        )
     
     id_topik = str(uuid.uuid4())
     query = Topik.insert().values(
@@ -385,15 +393,28 @@ async def deleteTopik(request: Request, data_topik: IdTopikSchema, response: Res
     #delete topik modul
     trans = conn.begin()
     try:
+        # Hapus relasi TopikModul
         query = TopikModul.delete().where(TopikModul.c.ms_id_topik == id_topik)
         conn.execute(query)
 
+        # Hapus Topik Utama
         query = Topik.delete().where(Topik.c.ms_id_topik == id_topik)
         conn.execute(query)
+        
         trans.commit()
+
+    # --- FIX 2: HANDLE DB INTEGRITY ERROR ---
+    except IntegrityError:
+        trans.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail="Gagal menghapus: Topik ini masih memiliki data terkait (misal: Akses Siswa) yang tidak bisa dihapus otomatis."
+        )
     except Exception as e:
         trans.rollback()
-        raise
+        raise HTTPException(status_code=500, detail=str(e))
+    # ----------------------------------------
+
     response = {"message": f"sukses menghapus data topik", "id_topik":id_topik}
     return response
 
