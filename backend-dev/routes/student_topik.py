@@ -13,7 +13,7 @@ router = APIRouter(
 @router.get("/topik_pembelajaran")
 def student_list_published_topik():
     sql = text("""
-        SELECT 
+        SELECT  
             t.id_topik AS id,
             t.nama_topik AS nama,
             t.deskripsi_topik AS deskripsi,

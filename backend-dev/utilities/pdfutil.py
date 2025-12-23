@@ -1,6 +1,39 @@
 from fpdf import FPDF
+from PyPDF2 import PdfReader
+from io import BytesIO
 from utilities.utils import check_folder
 import os
+
+
+def validate_pdf_content(file_content: bytes) -> tuple[bool, str]:
+    """
+    Validasi apakah file adalah PDF yang valid dan tidak corrupt.
+    
+    Args:
+        file_content: Bytes dari file yang diupload
+        
+    Returns:
+        tuple: (is_valid: bool, error_message: str)
+    """
+    # 1. Cek magic bytes (header PDF harus dimulai dengan %PDF-)
+    if not file_content.startswith(b'%PDF-'):
+        return False, "File bukan PDF yang valid (header tidak sesuai)"
+    
+    # 2. Coba baca PDF untuk memastikan tidak corrupt
+    try:
+        pdf_reader = PdfReader(BytesIO(file_content))
+        
+        # Cek apakah PDF memiliki halaman
+        if len(pdf_reader.pages) == 0:
+            return False, "PDF tidak memiliki halaman"
+        
+        # Coba akses halaman pertama untuk memastikan bisa dibaca
+        _ = pdf_reader.pages[0]
+        
+        return True, "PDF valid"
+        
+    except Exception as e:
+        return False, f"PDF corrupt atau rusak: {str(e)}"
 
 
 def create_pdf_data(file_name: str, title: str, listColumn: object, listKey: object, listData: object, listImageKey: list = []):
